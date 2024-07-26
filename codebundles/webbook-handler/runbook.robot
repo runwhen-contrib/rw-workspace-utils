@@ -14,9 +14,9 @@ Library           RW.Workspace
 Suite Initialization
     ${WEBHOOK_DATA}=     RW.Core.Import Memo Variable    WEBHOOK_DATA
     ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
-    ${RW_WORKSPACE_API_URL}=    RW.Core.Import User Variable    RW_WORKSPACE_API_URL
-    ${RW_WORKSPACE}=    RW.Core.Import User Variable    RW_WORKSPACE
-    ${RW_SESSION_ID}=    RW.Core.Import User Variable    RW_SESSION_ID
+    ${RW_WORKSPACE_API_URL}=    RW.Core.Import Platform Variable    RW_WORKSPACE_API_URL
+    ${RW_WORKSPACE}=    RW.Core.Import Platform Variable    RW_WORKSPACE
+    ${RW_SESSION_ID}=    RW.Core.Import Platform Variable    RW_SESSION_ID
     Set Suite Variable    ${env}    {"WEBHOOK_DATA":"${WEBHOOK_DATA}"}
     Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
     Set Suite Variable    ${RW_WORKSPACE_API_URL}    ${RW_WORKSPACE_API_URL}
