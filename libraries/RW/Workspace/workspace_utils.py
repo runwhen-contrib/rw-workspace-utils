@@ -3,6 +3,7 @@ Workspace keyword library for performing tasks for interacting with Workspace re
 
 Scope: Global
 """
+
 import re, logging, json, jmespath, requests
 from datetime import datetime
 from robot.libraries.BuiltIn import BuiltIn
@@ -39,31 +40,41 @@ def get_slxs_with_tag(
     s = platform.get_authenticated_session()
     url = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
     matching_slxs = []
-    
+
     try:
         response = s.get(url, timeout=10)
         response.raise_for_status()  # Ensure we raise an exception for bad responses
         all_slxs = response.json()  # Parse the JSON content
         results = all_slxs.get("results", [])
-        
+
         for result in results:
             tags = result.get("spec", {}).get("tags", [])
             for tag in tags:
-                if any(tag_item["name"] == tag["name"] and tag_item["value"] == tag["value"] for tag_item in tag_list):
+                if any(
+                    tag_item["name"] == tag["name"]
+                    and tag_item["value"] == tag["value"]
+                    for tag_item in tag_list
+                ):
                     matching_slxs.append(result)
                     break
 
         return matching_slxs
-    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
-        warning_log(f"Exception while trying to get SLXs in workspace {rw_workspace}: {e}", str(e), str(type(e)))
+    except (
+        requests.ConnectTimeout,
+        requests.ConnectionError,
+        json.JSONDecodeError,
+    ) as e:
+        warning_log(
+            f"Exception while trying to get SLXs in workspace {rw_workspace}: {e}",
+            str(e),
+            str(type(e)),
+        )
         platform_logger.exception(e)
         return []
 
+
 def run_tasks_for_slx(
-    slx: str,
-    rw_workspace_api_url: str,
-    rw_workspace: str,
-    rw_runsession: str
+    slx: str, rw_workspace_api_url: str, rw_workspace: str, rw_runsession: str
 ) -> list:
     """Given an slx and a runsession, add runrequest with all slx tasks to runsession.
 
@@ -78,18 +89,25 @@ def run_tasks_for_slx(
     """
     s = platform.get_authenticated_session()
 
-    # Get requestor ID
-    api_url = "/".join(rw_workspace_api_url.split("/")[:3])
-    whoami_url = f"{api_url}/api/v3/users/whoami"
-    try:
-        whoami_response=s.get(whoami_url, timeout=10)
-        whoami_response.raise_for_status()
-        whoami_data=whoami_response.json()
-        requester_id=whoami_data.get('id')
-    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
-        BuiltIn().log(f"Exception while trying to fetch requestor data: {e}", str(e), str(type(e)))
-        platform_logger.exception(e)
-        requester_id = 'None'  # Set to empty string if errored       
+    # Get requestor ID 
+    # Likely not needed -- unsure yet, so will keep this here until I know differently. 
+    # api_url = "/".join(rw_workspace_api_url.split("/")[:3])
+    # whoami_url = f"{api_url}/api/v3/users/whoami"
+    # try:
+    #     whoami_response = s.get(whoami_url, timeout=10)
+    #     whoami_response.raise_for_status()
+    #     whoami_data = whoami_response.json()
+    #     requester_id = whoami_data.get("id")
+    # except (
+    #     requests.ConnectTimeout,
+    #     requests.ConnectionError,
+    #     json.JSONDecodeError,
+    # ) as e:
+    #     BuiltIn().log(
+    #         f"Exception while trying to fetch requestor data: {e}", str(e), str(type(e))
+    #     )
+    #     platform_logger.exception(e)
+    #     requester_id = "None"  # Set to empty string if errored
 
     # Get all tasks for slx and concat into string separated by ||
     slx_url = f"{rw_workspace_api_url}/{rw_workspace}/slxs/{slx}/runbook"
@@ -98,29 +116,46 @@ def run_tasks_for_slx(
         slx_response = s.get(slx_url, timeout=10)
         slx_response.raise_for_status()
         slx_data = slx_response.json()  # Parse JSON content
-        tasks = slx_data.get('status', {}).get('codeBundle', {}).get('tasks', [])
-        tasks_string = '||'.join(tasks)
-    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
-        BuiltIn().log(f"Exception while trying to fetch list of slx tasks : {e}", str(e), str(type(e)))
+        tasks = slx_data.get("status", {}).get("codeBundle", {}).get("tasks", [])
+    except (
+        requests.ConnectTimeout,
+        requests.ConnectionError,
+        json.JSONDecodeError,
+    ) as e:
+        BuiltIn().log(
+            f"Exception while trying to fetch list of slx tasks : {e}",
+            str(e),
+            str(type(e)),
+        )
         platform_logger.exception(e)
-        tasks_string = ''  # Set to empty string if errored
-
+        tasks_string = ""  # Set to empty string if errored
 
     runrequest_details = {
-        "runsession": rw_runsession,
-        "requester": requester_id,
-        "taskTitles": tasks_string
+        "runRequests": [
+            {
+                "slxName": f"{rw_workspace}--{slx}",
+                "taskTitles": tasks
+            }
+        ]
     }
 
     # Add RunRequest
-    rr_url = f"{rw_workspace_api_url}/{rw_workspace}/slxs/{slx}/runbook/runs"
-    
+    rs_url = f"{rw_workspace_api_url}/{rw_workspace}/runsessions/{rw_runsession}"
+
     try:
-        response = s.post(rr_url, json=runrequest_details, timeout=10)
+        response = s.patch(rs_url, json=runrequest_details, timeout=10)
         response.raise_for_status()  # Ensure we raise an exception for bad responses
         return response.json()
 
-    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
-        BuiltIn().log(f"Exception while trying add runrequest to runsession {rw_runsession} : {e}", str(e), str(type(e)))
+    except (
+        requests.ConnectTimeout,
+        requests.ConnectionError,
+        json.JSONDecodeError,
+    ) as e:
+        BuiltIn().log(
+            f"Exception while trying add runrequest to runsession {rw_runsession} : {e}",
+            str(e),
+            str(type(e)),
+        )
         platform_logger.exception(e)
         return []
