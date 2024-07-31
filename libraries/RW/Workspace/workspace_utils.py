@@ -65,24 +65,62 @@ def run_tasks_for_slx(
     rw_workspace: str,
     rw_runsession: str
 ) -> list:
-    """Given a list of tags, return all SLXs in the workspace that have those tags.
+    """Given an slx and a runsession, add runrequest with all slx tasks to runsession.
 
     Args:
-        tag_list (list): the given list of tags as dictionaries
+        slx (string): slx short name
+        rw_workspace_api_url (string): workspace PAPI endpoint
+        rw_workspace (string): workspace name
+        rw_runsession (string): runsession ID
 
     Returns:
         list: List of SLXs that match the given tags
     """
     s = platform.get_authenticated_session()
-    runrequest_details = {"runsession": rw_runsession}
-    url = f"{rw_workspace_api_url}/{rw_workspace}/slxs/{slx}/runbook/runs"
+
+    # Get requestor ID
+    api_url = "/".join(rw_workspace_api_url.split("/")[:3])
+    whoami_url = f"{api_url}/api/v3/users/whoami"
+    try:
+        whoami_response=s.get(whoami_url, timeout=10)
+        whoami_response.raise_for_status()
+        whoami_data=whoami_response.json()
+        requester_id=whoami_data.get('id')
+    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
+        BuiltIn().log(f"Exception while trying to fetch requestor data: {e}", str(e), str(type(e)))
+        platform_logger.exception(e)
+        requester_id = 'None'  # Set to empty string if errored       
+
+    # Get all tasks for slx and concat into string separated by ||
+    slx_url = f"{rw_workspace_api_url}/{rw_workspace}/slxs/{slx}/runbook"
+
+    try:
+        slx_response = s.get(slx_url, timeout=10)
+        slx_response.raise_for_status()
+        slx_data = slx_response.json()  # Parse JSON content
+        tasks = slx_data.get('status', {}).get('codeBundle', {}).get('tasks', [])
+        tasks_string = '||'.join(tasks)
+    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
+        BuiltIn().log(f"Exception while trying to fetch list of slx tasks : {e}", str(e), str(type(e)))
+        platform_logger.exception(e)
+        tasks_string = ''  # Set to empty string if errored
+
+
+    runrequest_details = {
+        "runsession": rw_runsession,
+        "requester": requester_id,
+        "taskTitles": tasks_string
+    }
+
+    # Add RunRequest
+    rr_url = f"{rw_workspace_api_url}/{rw_workspace}/slxs/{slx}/runbook/runs"
     
     try:
-        response = s.post(url, json=runrequest_details, timeout=10)
+        response = s.post(rr_url, json=runrequest_details, timeout=10)
         response.raise_for_status()  # Ensure we raise an exception for bad responses
         return response.json()
 
     except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
-        warning_log(f"Exception while trying add runrequest to runsession {rw_runsession} : {e}", str(e), str(type(e)))
+        BuiltIn().log(f"Exception while trying add runrequest to runsession {rw_runsession} : {e}", str(e), str(type(e)))
         platform_logger.exception(e)
         return []
