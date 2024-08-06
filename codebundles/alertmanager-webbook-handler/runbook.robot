@@ -12,7 +12,7 @@ Library           RW.Workspace
 
 *** Keywords ***
 Suite Initialization
-    ${WEBHOOK_DATA}=     RW.Core.Import Memo Variable    webhookJson
+    ${WEBHOOK_DATA}=     RW.Workspace.Import Memo Variable    webhookJson
     ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
     ${RW_WORKSPACE_API_URL}=    RW.Core.Import Platform Variable    RW_WORKSPACE_API_URL
     ${RW_WORKSPACE}=    RW.Core.Import Platform Variable    RW_WORKSPACE

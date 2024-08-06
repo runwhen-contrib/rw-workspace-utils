@@ -159,3 +159,29 @@ def run_tasks_for_slx(
         )
         platform_logger.exception(e)
         return []
+
+
+def import_memo_variable(key: str):
+    """If this is a runbook, the runsession / runrequest may have been initiated with
+    a memo value.  Get the value for key within the memo, or None if there was no
+    value found or if there was no memo provided (e.g. with an SLI)
+    """
+    try:
+        slx_api_url = import_platform_variable("RW_SLX_API_URL")
+        runrequest_id = import_platform_variable("RW_RUNREQUEST_ID")
+    except ImportError:
+        return None
+    s = get_authenticated_session()
+    url = f"{slx_api_url}/runbook/runs/{runrequest_id}"
+    try:
+        rsp = s.get(url, timeout=10, verify=REQUEST_VERIFY)
+        memo_list = rsp.json().get("memo", [])
+        if isinstance(memo_list, list):
+            for memo in memo_list:
+                if isinstance(memo, dict) and key in memo:
+                    return memo[key]
+        return None
+    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
+        warning_log(f"exception while trying to get memo: {e}", str(e), str(type(e)))
+        platform_logger.exception(e)
+        return None
