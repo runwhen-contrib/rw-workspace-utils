@@ -167,11 +167,11 @@ def import_memo_variable(key: str):
     value found or if there was no memo provided (e.g. with an SLI)
     """
     try:
-        slx_api_url = import_platform_variable("RW_SLX_API_URL")
-        runrequest_id = import_platform_variable("RW_RUNREQUEST_ID")
+        slx_api_url = platform.import_platform_variable("RW_SLX_API_URL")
+        runrequest_id = platform.import_platform_variable("RW_RUNREQUEST_ID")
     except ImportError:
         return None
-    s = get_authenticated_session()
+    s = platform.get_authenticated_session()
     url = f"{slx_api_url}/runbook/runs/{runrequest_id}"
     try:
         rsp = s.get(url, timeout=10, verify=REQUEST_VERIFY)
@@ -185,20 +185,3 @@ def import_memo_variable(key: str):
         warning_log(f"exception while trying to get memo: {e}", str(e), str(type(e)))
         platform_logger.exception(e)
         return None
-
-def import_platform_variable(varname: str) -> str:
-    """
-    Imports a variable set by the platform, raises error if not available.
-
-    :param str: Name to be used both to lookup the config val and for the
-        variable name in robot
-    :return: The value found
-    """
-    if not varname.startswith("RW_"):
-        raise ValueError(
-            f"Variable {varname!r} is not a RunWhen platform variable, Use Import User Variable keyword instead."
-        )
-    val = os.getenv(varname)
-    if not val:
-        raise ImportError(f"Import Platform Variable: {varname} has no value defined.")
-    return val
