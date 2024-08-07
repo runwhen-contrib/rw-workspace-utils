@@ -4,7 +4,7 @@ Workspace keyword library for performing tasks for interacting with Workspace re
 Scope: Global
 """
 
-import re, logging, json, jmespath, requests
+import re, logging, json, jmespath, requests, os
 from datetime import datetime
 from robot.libraries.BuiltIn import BuiltIn
 
@@ -161,27 +161,50 @@ def run_tasks_for_slx(
         return []
 
 
-def import_memo_variable(key: str):
+def import_memo_variable(key: str, rw_workspace_api_url: str, rw_workspace: str, rw_runsession: str):
     """If this is a runbook, the runsession / runrequest may have been initiated with
-    a memo value.  Get the value for key within the memo, or None if there was no
+    a memo value. Get the value for key within the memo, or None if there was no
     value found or if there was no memo provided (e.g. with an SLI)
     """
-    try:
-        slx_api_url = platform.import_platform_variable("RW_SLX_API_URL")
-        runrequest_id = platform.import_platform_variable("RW_RUNREQUEST_ID")
-    except ImportError:
-        return None
     s = platform.get_authenticated_session()
-    url = f"{slx_api_url}/runbook/runs/{runrequest_id}"
+    url = f"{rw_workspace_api_url}/{rw_workspace}/runsessions/{rw_runsession}"
+    BuiltIn().log(f"Importing memo variable with URL: {url}", level='INFO')
+
     try:
         rsp = s.get(url, timeout=10, verify=platform.REQUEST_VERIFY)
-        memo_list = rsp.json().get("memo", [])
-        if isinstance(memo_list, list):
-            for memo in memo_list:
-                if isinstance(memo, dict) and key in memo:
-                    return memo[key]
-        return None
+        run_requests = rsp.json().get("runRequests", [])
+        for run_request in run_requests:
+            memo_list = run_request.get("memo", [])
+            if isinstance(memo_list, list):
+                for memo in memo_list:
+                    if isinstance(memo, dict) and key in memo:
+                        # Ensure the value is JSON-serializable
+                        value = memo[key]
+                        try:
+                            json.dumps(value)  # Check if value is JSON serializable
+                            return json.dumps(value)  # Return as JSON string
+                        except (TypeError, ValueError):
+                            BuiltIn().log(f"Value for key '{key}' is not JSON-serializable: {value}", level='WARN')
+                            return json.dumps(str(value))  # Convert non-serializable value to string
+        return json.dumps(None)
     except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
-        warning_log(f"exception while trying to get memo: {e}", str(e), str(type(e)))
+        warning_log(f"Exception while trying to get memo: {e}", str(e), str(type(e)))
         platform_logger.exception(e)
-        return None
+        return json.dumps(None)
+
+def import_platform_variable(varname: str) -> str:
+    """
+    Imports a variable set by the platform, raises error if not available.
+
+    :param str: Name to be used both to lookup the config val and for the
+        variable name in robot
+    :return: The value found
+    """
+    if not varname.startswith("RW_"):
+        raise ValueError(
+            f"Variable {varname!r} is not a RunWhen platform variable, Use Import User Variable keyword instead."
+        )
+    val = os.getenv(varname)
+    if not val:
+        raise ImportError(f"Import Platform Variable: {varname} has no value defined.")
+    return val
