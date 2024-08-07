@@ -174,7 +174,7 @@ def import_memo_variable(key: str):
     s = platform.get_authenticated_session()
     url = f"{slx_api_url}/runbook/runs/{runrequest_id}"
     try:
-        rsp = s.get(url, timeout=10, verify=REQUEST_VERIFY)
+        rsp = s.get(url, timeout=10, verify=platform.REQUEST_VERIFY)
         memo_list = rsp.json().get("memo", [])
         if isinstance(memo_list, list):
             for memo in memo_list:
