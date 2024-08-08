@@ -21,7 +21,7 @@ Suite Initialization
 Run SLX Tasks with matching PagerDuty Webhook Service ID
     [Documentation]    Parse the webhook details and route to the right SLX
     [Tags]    webhook    grafana    alertmanager    alert    runwhen
-    IF    $WEBHOOK_JSON["event"]["event_type"] == "incident.triggered"
+    IF    $WEBHOOK_JSON["event"]["eventType"] == "incident.triggered"
         Log    Running SLX Tasks that match PagerDuty Service ID ${WEBHOOK_JSON["event"]["data"]["service"]["id"]}
         ${slx_list}=    RW.Workspace.Get SLXs with Tag
         ...    tag_list=[{"name": "pagerduty_service", "value": "${WEBHOOK_JSON["event"]["data"]["service"]["id"]}"}]
