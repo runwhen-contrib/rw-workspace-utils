@@ -26,8 +26,6 @@ SECRET_FILE_PREFIX = "secret_file__"
 
 def get_slxs_with_tag(
     tag_list: list,
-    rw_workspace_api_url: str,
-    rw_workspace: str,
 ) -> list:
     """Given a list of tags, return all SLXs in the workspace that have those tags.
 
@@ -37,6 +35,14 @@ def get_slxs_with_tag(
     Returns:
         list: List of SLXs that match the given tags
     """
+    try:
+        runrequest_id = import_platform_variable("RW_RUNREQUEST_ID")
+        rw_runsession = import_platform_variable("RW_SESSION_ID")
+        rw_workspace = import_platform_variable("RW_WORKSPACE")
+        rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError:
+        return None
+
     s = platform.get_authenticated_session()
     url = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
     matching_slxs = []
@@ -74,40 +80,25 @@ def get_slxs_with_tag(
 
 
 def run_tasks_for_slx(
-    slx: str, rw_workspace_api_url: str, rw_workspace: str, rw_runsession: str
+    slx: str,
 ) -> list:
     """Given an slx and a runsession, add runrequest with all slx tasks to runsession.
 
     Args:
         slx (string): slx short name
-        rw_workspace_api_url (string): workspace PAPI endpoint
-        rw_workspace (string): workspace name
-        rw_runsession (string): runsession ID
 
     Returns:
         list: List of SLXs that match the given tags
     """
+    try:
+        runrequest_id = import_platform_variable("RW_RUNREQUEST_ID")
+        rw_runsession = import_platform_variable("RW_SESSION_ID")
+        rw_workspace = import_platform_variable("RW_WORKSPACE")
+        rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError:
+        return None
     s = platform.get_authenticated_session()
 
-    # Get requestor ID 
-    # Likely not needed -- unsure yet, so will keep this here until I know differently. 
-    # api_url = "/".join(rw_workspace_api_url.split("/")[:3])
-    # whoami_url = f"{api_url}/api/v3/users/whoami"
-    # try:
-    #     whoami_response = s.get(whoami_url, timeout=10)
-    #     whoami_response.raise_for_status()
-    #     whoami_data = whoami_response.json()
-    #     requester_id = whoami_data.get("id")
-    # except (
-    #     requests.ConnectTimeout,
-    #     requests.ConnectionError,
-    #     json.JSONDecodeError,
-    # ) as e:
-    #     BuiltIn().log(
-    #         f"Exception while trying to fetch requestor data: {e}", str(e), str(type(e))
-    #     )
-    #     platform_logger.exception(e)
-    #     requester_id = "None"  # Set to empty string if errored
 
     # Get all tasks for slx and concat into string separated by ||
     slx_url = f"{rw_workspace_api_url}/{rw_workspace}/slxs/{slx}/runbook"
@@ -161,31 +152,48 @@ def run_tasks_for_slx(
         return []
 
 
-def import_memo_variable(key: str, rw_workspace_api_url: str, rw_workspace: str, rw_runsession: str):
+## This is an edit of the core platform keyword that was having trouble
+## This has been been rewritten to avoid debugging core keywords that follow
+## a separate build process. This may need to be refactored into the runtime later. 
+## The main difference here is that we fetch the memo from the runsession instead
+## of the runrequest - and as well we return valid json, which wouldn't be appropriate
+## for all memo keys, but works for the Json payload. 
+def import_memo_variable(key: str):
     """If this is a runbook, the runsession / runrequest may have been initiated with
     a memo value. Get the value for key within the memo, or None if there was no
     value found or if there was no memo provided (e.g. with an SLI)
     """
+    try:
+        runrequest_id = str(import_platform_variable("RW_RUNREQUEST_ID"))
+        rw_runsession = import_platform_variable("RW_SESSION_ID")
+        rw_workspace = import_platform_variable("RW_WORKSPACE")
+        rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError:
+        BuiltIn().log(f"Failure importing required variables", level='WARN')
+        return None
+
     s = platform.get_authenticated_session()
     url = f"{rw_workspace_api_url}/{rw_workspace}/runsessions/{rw_runsession}"
-    BuiltIn().log(f"Importing memo variable with URL: {url}", level='INFO')
+    BuiltIn().log(f"Importing memo variable with URL: {url}, runrequest {runrequest_id}", level='INFO')
 
     try:
         rsp = s.get(url, timeout=10, verify=platform.REQUEST_VERIFY)
         run_requests = rsp.json().get("runRequests", [])
         for run_request in run_requests:
-            memo_list = run_request.get("memo", [])
-            if isinstance(memo_list, list):
-                for memo in memo_list:
-                    if isinstance(memo, dict) and key in memo:
-                        # Ensure the value is JSON-serializable
-                        value = memo[key]
-                        try:
-                            json.dumps(value)  # Check if value is JSON serializable
-                            return json.dumps(value)  # Return as JSON string
-                        except (TypeError, ValueError):
-                            BuiltIn().log(f"Value for key '{key}' is not JSON-serializable: {value}", level='WARN')
-                            return json.dumps(str(value))  # Convert non-serializable value to string
+            if str(run_request.get("id")) == runrequest_id:
+                memo_list = run_request.get("memo", [])
+                if isinstance(memo_list, list):
+                    for memo in memo_list:
+                        if isinstance(memo, dict) and key in memo:
+                            # Ensure the value is JSON-serializable
+                            ## TODO Handle non json memo data
+                            value = memo[key]
+                            try:
+                                json.dumps(value)  # Check if value is JSON serializable
+                                return json.dumps(value)  # Return as JSON string
+                            except (TypeError, ValueError):
+                                BuiltIn().log(f"Value for key '{key}' is not JSON-serializable: {value}", level='WARN')
+                                return json.dumps(str(value))  # Convert non-serializable value to string
         return json.dumps(None)
     except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
         warning_log(f"Exception while trying to get memo: {e}", str(e), str(type(e)))

@@ -12,21 +12,11 @@ Library           RW.Workspace
 
 *** Keywords ***
 Suite Initialization
-    ${RW_WORKSPACE_API_URL}=    RW.Core.Import Platform Variable    RW_WORKSPACE_API_URL
-    ${RW_WORKSPACE}=    RW.Core.Import Platform Variable    RW_WORKSPACE
-    ${RW_SESSION_ID}=    RW.Core.Import Platform Variable    RW_SESSION_ID
-    Set Suite Variable    ${RW_WORKSPACE_API_URL}    ${RW_WORKSPACE_API_URL}
-    Set Suite Variable    ${RW_WORKSPACE}    ${RW_WORKSPACE}
-    Set Suite Variable    ${RW_SESSION_ID}    ${RW_SESSION_ID}
     ${WEBHOOK_DATA}=     RW.Workspace.Import Memo Variable    
     ...    key=webhookJson
-    ...    rw_workspace_api_url=${RW_WORKSPACE_API_URL}
-    ...    rw_workspace=${RW_WORKSPACE}
-    ...    rw_runsession=${RW_SESSION_ID}
     ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
     Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
 
-    # ${SESSION}=          RW.Core.Get Authenticated Session
 *** Tasks ***
 Run SLX Tasks with matching AlertManager Webhook commonLabels
     [Documentation]    Parse the alertmanager webhook commonLabels and route and SLX where commonLabels match SLX tags
@@ -36,14 +26,10 @@ Run SLX Tasks with matching AlertManager Webhook commonLabels
         ${common_labels_list}=    Evaluate    [{'name': k, 'value': v} for k, v in ${WEBHOOK_JSON["commonLabels"]}.items()]
         ${slx_list}=    RW.Workspace.Get SLXs with Tag
         ...    tag_list=${common_labels_list}
-        ...    rw_workspace_api_url=${RW_WORKSPACE_API_URL}
-        ...    rw_workspace=${RW_WORKSPACE}
+        Log    Results: ${slx_list}
         FOR    ${slx}    IN    @{slx_list} 
             Log    ${slx["shortName"]} has matched
             ${runrequest}=    RW.Workspace.Run Tasks for SLX
             ...    slx=${slx["shortName"]}
-            ...    rw_workspace_api_url=${RW_WORKSPACE_API_URL}
-            ...    rw_workspace=${RW_WORKSPACE}
-            ...    rw_runsession=${RW_SESSION_ID}
         END
     END
