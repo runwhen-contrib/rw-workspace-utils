@@ -4,17 +4,26 @@
 private_registry="${ACR_REGISTRY}"
 
 # Set Architecture
-desired_architecture="amd64"
+desired_architecture="${IMAGE_ARCHITECTURE}"
 
 # Specify values file
-values_file="sample_values.yaml"
-new_values_file="updated_values.yaml"
+values_file="../sample_values.yaml"
+new_values_file="../updated_values.yaml"
 
 # Tag exclusion list
 tag_exclusion_list=("tester")
 
 # Generate a unique date-based tag
 date_based_tag=$(date +%Y%m%d%H%M%S)
+
+# Docker Hub credentials
+docker_username="${DOCKER_USERNAME}"
+docker_token="${DOCKER_TOKEN}"
+
+# Ensure Docker credentials are set to avoid throttling
+if [[ -z "$docker_username" || -z "$docker_token" ]]; then
+    echo "Warning: Docker credentials (DOCKER_USERNAME and DOCKER_TOKEN) should be set to avoid throttling."
+fi
 
 runwhen_local_images=$(cat <<EOF
 {
@@ -45,7 +54,6 @@ runwhen_local_images=$(cat <<EOF
 }
 EOF
 )
-
 
 codecollection_images=$(cat <<EOF
 {
@@ -90,12 +98,13 @@ get_sorted_tags_by_date() {
     repository_image=$1
     echo "Fetching tags for repository image: $repository_image with architecture: $desired_architecture" >&2
 
-    # Check if the repository image is from Google Artifact Registry
-    ## TODO Add additional checks for other repo types if necessary; 
-    ## which at this time is not, as all other tags are explicitly defined.
+    # Check if the repository image is from Google Artifact Registry or Docker
     if [[ $repository_image == *.pkg.dev/* ]]; then
         REPO_URL="https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/tags/list"
         TAGS=$(curl -s "$REPO_URL" | jq -r '.tags[]')
+    elif [[ $repository_image == docker.io/* ]]; then
+        REPO_URL="https://registry.hub.docker.com/v2/repositories/${repository_image#docker.io/}/tags"
+        TAGS=$(eval curl -s "$REPO_URL" | jq -r '.results[].name')
     else
         echo "Unsupported repository type: $repository_image" >&2
         return
@@ -144,6 +153,9 @@ get_sorted_tags_by_date() {
                     tag_dates+=("$CREATION_DATE $TAG")
                 fi
             fi
+        elif [[ $repository_image == docker.io/* ]]; then
+            echo "Processing Docker Hub tag: $TAG"
+            # Docker Hub logic can be expanded if needed for multi-arch
         else
             echo "Unsupported repository type: $repository_image" >&2
             return
@@ -159,15 +171,41 @@ get_sorted_tags_by_date() {
     echo $sorted_tags
 }
 
-# Function to copy image using az import
+
+# Function to copy image using az acr import with Docker Hub authentication only if the source is Docker Hub
 copy_image() {
     repository_image=$1
     src_tag=$2
     destination=$3
     dest_tag=$4
 
-    # Remove echo when ready 
-    az acr import -n ${private_registry} --source ${repository_image}:${src_tag} --image ${destination}:${dest_tag}
+    echo "Importing image $repository_image:$src_tag to $private_registry/$destination:$dest_tag..."
+
+    # Initialize the command with the basic az acr import structure
+    cmd="az acr import -n ${private_registry} --source ${repository_image}:${src_tag} --image ${destination}:${dest_tag} --force"
+
+    # Conditionally add Docker authentication if the repository is from Docker Hub and credentials are set
+    if [[ $repository_image == docker.io/* ]]; then
+        if [[ -n "$docker_username" && -n "$docker_token" ]]; then
+            echo "Docker Hub image detected. Using Docker credentials for import..."
+            cmd+=" --username ${docker_username} --password ${docker_token}"
+        else
+            echo "Warning: Docker Hub image detected but credentials are not set. Throttling might occur."
+        fi
+    else
+        echo "Non-Docker Hub image detected. No Docker credentials needed."
+    fi
+
+    # Execute the dynamically constructed command
+    eval $cmd
+
+    # Check if the import succeeded
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to import image ${repository_image}:${src_tag} to ${private_registry}/${destination}:${dest_tag}"
+        exit 1
+    fi
+
+    echo "Image ${private_registry}/${destination}:${dest_tag} imported successfully"
 }
 
 # Function to update image registry and repository in values file
@@ -298,6 +336,5 @@ main() {
         echo "No $new_values_file file found."
     fi
 }
-
 # Execute the main script
 main
