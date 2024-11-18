@@ -1,15 +1,32 @@
 *** Settings ***
 Metadata          Author    stewartshea
 Documentation     This CodeBundle will sync all of the images needed to operate RunWhen (Local + Runner components), to Azure ACR using the az cli. 
-Metadata          Supports     Azure,ACR
+Metadata          Supports     Azure,ACR,RunWhen
 Metadata          Display Name     Azure RunWhen ACR Image Sync
+
 Suite Setup       Suite Initialization
+
 Library           BuiltIn
 Library           RW.Core
 Library           RW.platform
 Library           OperatingSystem
 Library           RW.CLI
 
+
+*** Tasks ***
+Sync RunWhen Local Images into Azure Container Registry `${ACR_REGISTRY}`
+    [Documentation]    Sync latest images for RunWhen into ACR
+    [Tags]    azure    acr    registry    runwhen
+    ${az_rw_acr_image_sync}=    RW.CLI.Run Bash File
+    ...    bash_file=sync_with_az_import.sh
+    ...    env=${env}
+    ...    include_in_history=False
+    ...    secret__DOCKER_USERNAME=${DOCKER_USERNAME}
+    ...    secret__DOCKER_TOKEN=${DOCKER_TOKEN}
+    ...    timeout_seconds=1200
+    ${helm_output}=    RW.CLI.Run CLI
+    ...    cmd= cat ../updated_values.yaml
+    RW.Core.Add Pre To Report    Updated Helm Values for RunWhen Local:\n${helm_output.stdout}
 
 *** Keywords ***
 Suite Initialization
@@ -25,16 +42,18 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=amd64
     ...    default=amd64
-    ${DOCKER_USERNAME}=    RW.Core.Import Secret
-    ...    DOCKER_USERNAME
+    Set Suite Variable    ${DOCKER_USERNAME}    ""
+    Set Suite Variable    ${DOCKER_TOKEN}    ""
+    ${USE_DOCKER_AUTH}=    RW.Core.Import User Variable
+    ...    USE_DOCKER_AUTH
     ...    type=string
-    ...    description=Docker username to use if rate limited by Docker. 
+    ...    enum=[true,false]
+    ...    description=Import the docker secret for authentication. Useful in bypassing rate limits. 
     ...    pattern=\w*
-    ${DOCKER_TOKEN}=    RW.Core.Import Secret
-    ...    DOCKER_TOKEN
-    ...    type=string
-    ...    description=Docker token to use if rate limited by Docker.
-    ...    pattern=\w*
+    ...    default=false
+    Set Suite Variable    ${USE_DOCKER_AUTH}    ${USE_DOCKER_AUTH}
+    Run Keyword If    "${USE_DOCKER_AUTH}" == "true"    Import Docker Secrets
+
     ${azure_credentials}=    RW.Core.Import Secret
     ...    azure_credentials
     ...    type=string
@@ -44,17 +63,17 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"ACR_REGISTRY":"${ACR_REGISTRY}", "IMAGE_ARCHITECTURE": "${IMAGE_ARCHITECTURE}"}
-*** Tasks ***
-Sync RunWhen Local Images into Azure Container Registry `${ACR_REGISTRY}`
-    [Documentation]    Sync latest images for RunWhen into ACR
-    [Tags]    azure    acr    registry    runwhen
-    ${az_rw_acr_image_sync}=    RW.CLI.Run Bash File
-    ...    bash_file=sync_with_az_import.sh
-    ...    env=${env}
-    ...    include_in_history=False
-    ...    secret__DOCKER_USERNAME=${DOCKER_USERNAME}
-    ...    secret__DOCKER_TOKEN=${DOCKER_TOKEN}
-    ...    timeout_seconds=1200
-    ${helm_output}=    RW.CLI.Run CLI
-    ...    cmd= cat ../updated_values.yaml
-    RW.Core.Add Pre To Report    Updated Helm Values for RunWhen Local:\n${helm_output.stdout}
+    ...    
+
+Import Docker Secrets
+    ${DOCKER_USERNAME}=    RW.Core.Import Secret
+    ...    DOCKER_USERNAME
+    ...    type=string
+    ...    description=Docker username to use if rate limited by Docker.
+    ...    pattern=\w*
+    ${DOCKER_TOKEN}=    RW.Core.Import Secret
+    ...    DOCKER_TOKEN
+    ...    type=string
+    ...    description=Docker token to use if rate limited by Docker.
+    ...    pattern=\w*
+    
