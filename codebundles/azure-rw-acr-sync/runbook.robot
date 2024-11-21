@@ -14,11 +14,11 @@ Library           RW.CLI
 
 
 *** Tasks ***
-Sync RunWhen Local Images into Azure Container Registry `${ACR_REGISTRY}`
+Sync RunWhen Local Images into ACR `${ACR_REGISTRY}`
     [Documentation]    Sync latest images for RunWhen into ACR
     [Tags]    azure    acr    registry    runwhen
     ${az_rw_acr_image_sync}=    RW.CLI.Run Bash File
-    ...    bash_file=sync_with_az_import.sh
+    ...    bash_file=codebundles/azure-rw-acr-sync/sync_with_az_import.sh
     ...    env=${env}
     ...    include_in_history=False
     ...    secret__DOCKER_USERNAME=${DOCKER_USERNAME}
@@ -63,7 +63,6 @@ Suite Initialization
     Set Suite Variable
     ...    ${env}
     ...    {"ACR_REGISTRY":"${ACR_REGISTRY}", "IMAGE_ARCHITECTURE": "${IMAGE_ARCHITECTURE}"}
-    ...    
 
 Import Docker Secrets
     ${DOCKER_USERNAME}=    RW.Core.Import Secret

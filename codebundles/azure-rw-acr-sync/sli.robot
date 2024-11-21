@@ -1,0 +1,77 @@
+*** Settings ***
+Documentation       Determines if any RunWhen CodeCollection or private runner components require image updates. 
+Metadata            Author    stewartshea
+Metadata            Display Name    RunWhen Platform Azure ACR Image Sync
+Metadata            Supports    Azure    ACR    Update    RunWhen    CodeCollection
+
+Library             BuiltIn
+Library             RW.Core
+Library             RW.CLI
+Library             RW.platform
+
+Suite Setup         Suite Initialization
+*** Tasks ***
+Check for CodeCollection Updates against ACR Registry`${REGISTRY_NAME}`
+    [Documentation]    Count the number of CodeCollection image upates that need to be synced internally to the private registry. 
+    [Tags]    acr    update    codecollection    utility
+    ${codecollection_images}=    RW.CLI.Run Bash File
+    ...    bash_file=rwl_codecollection_updates.sh
+    ...    env=${env}
+    ...    timeout_seconds=240
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=false
+
+    ${image_update_count}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT DIR}/azure-rw-acr-sync/cc_images_to_update.json | jq 'if . == null or . == [] then 0 else length end' | tr -d '\n'
+    ...    env=${env}
+    ...    include_in_history=false
+
+    Set Global Variable    ${outdated_codecollection_images}    ${image_update_count.stdout}
+
+
+Add Up Images and Push Metric
+    ${total_images}=      Evaluate  (${outdated_codecollection_images})
+    RW.Core.Push Metric    ${total_images}
+
+*** Keywords ***
+Suite Initialization
+    ${REGISTRY_NAME}=    RW.Core.Import User Variable    REGISTRY_NAME
+    ...    type=string
+    ...    description=The name of the Azure Container Registry to import images into. 
+    ...    pattern=\w*
+    ...    example=myacr.azurecr.io
+    ...    default=myacr.azurecr.io
+    Set Suite Variable    ${DOCKER_USERNAME}    ""
+    Set Suite Variable    ${DOCKER_TOKEN}    ""
+    ${USE_DOCKER_AUTH}=    RW.Core.Import User Variable
+    ...    USE_DOCKER_AUTH
+    ...    type=string
+    ...    enum=[true,false]
+    ...    description=Import the docker secret for authentication. Useful in bypassing rate limits. 
+    ...    pattern=\w*
+    ...    default=false
+    Set Suite Variable    ${USE_DOCKER_AUTH}    ${USE_DOCKER_AUTH}
+    Run Keyword If    "${USE_DOCKER_AUTH}" == "true"    Import Docker Secrets
+
+    ${azure_credentials}=    RW.Core.Import Secret
+    ...    azure_credentials
+    ...    type=string
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    pattern=\w*
+
+    Set Suite Variable
+    ...    ${env}
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync"}
+
+
+Import Docker Secrets
+    ${DOCKER_USERNAME}=    RW.Core.Import Secret
+    ...    DOCKER_USERNAME
+    ...    type=string
+    ...    description=Docker username to use if rate limited by Docker.
+    ...    pattern=\w*
+    ${DOCKER_TOKEN}=    RW.Core.Import Secret
+    ...    DOCKER_TOKEN
+    ...    type=string
+    ...    description=Docker token to use if rate limited by Docker.
+    ...    pattern=\w*

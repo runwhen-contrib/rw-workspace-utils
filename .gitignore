@@ -8,7 +8,8 @@ build
 *egg-info
 .kube
 *.out
-
+**tf.secret**
+**/auth/**
 
 
 
