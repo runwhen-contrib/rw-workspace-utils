@@ -9,8 +9,13 @@ spec:
         matches:
         - resourceType: variables
           type: pattern
-          pattern: "acr"
+          pattern: "azure_acr"
           properties: [custom/private_registry]
+          mode: substring
+        - resourceType: variables
+          type: pattern
+          pattern: "."
+          properties: [custom/azure_acr_registry]
           mode: substring
         - type: pattern
           pattern: "runner"

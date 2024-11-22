@@ -95,8 +95,8 @@ tasks:
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
         custom: 
-          private_registry: acr
-          acr_registry: runwhensandboxacr
+          private_registry: azure_acr
+          azure_acr_registry: runwhensandboxacr.azurecr.io
         EOF
     silent: true
 

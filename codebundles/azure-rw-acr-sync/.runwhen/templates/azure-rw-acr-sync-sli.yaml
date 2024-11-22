@@ -25,10 +25,10 @@ spec:
     {% endif %}
     pathToRobot: codebundles/azure-rw-acr-sync/sli.robot
   intervalStrategy: intermezzo
-  intervalSeconds: 300
+  intervalSeconds: 600
   configProvided:
     - name: REGISTRY_NAME
-      value: {{custom.acr_name}}
+      value: {{custom.azure_acr_registry}}
     - name: REGISTRY_REPOSITORY_PATH
       value: "runwhen"
     - name: USE_DOCKER_AUTH
