@@ -35,7 +35,7 @@ if [[ -z "$docker_username" || -z "$docker_token" ]]; then
     echo "Warning: Docker credentials (DOCKER_USERNAME and DOCKER_TOKEN) should be set to avoid throttling."
 fi
 
-az acr login -n "$private_registry"
+az acr login -n "$private_registry" --expose-token
 
 codecollection_images=$(cat <<EOF
 {

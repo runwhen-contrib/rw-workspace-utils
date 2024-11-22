@@ -53,7 +53,7 @@ function configure_registry() {
                     echo "Using specified subscription ID: $subscription"
                 fi
                 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-                az acr login -n "$REGISTRY_URL"
+                az acr login -n "$REGISTRY_URL" --expose-token
             else
                 echo "Error: REGISTRY_NAME is not specified. Exiting."
                 exit 1

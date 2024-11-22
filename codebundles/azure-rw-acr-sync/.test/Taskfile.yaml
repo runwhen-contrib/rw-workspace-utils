@@ -97,6 +97,7 @@ tasks:
         custom: 
           private_registry: azure_acr
           azure_acr_registry: runwhensandboxacr.azurecr.io
+          azure_service_principal_secret_name: azure-sp
         EOF
     silent: true
 

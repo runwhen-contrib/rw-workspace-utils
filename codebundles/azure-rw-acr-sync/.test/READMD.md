@@ -10,3 +10,6 @@ export USE_DATE_TAG="true"
 
 export IMAGE_ARCHITECTURE="amd64"
 export USE_DOCKER_AUTH="false"
+
+# Notes
+This test rig is hacky and needs clean up. It's using an existing cluster and resources not yet made by this folder. 
