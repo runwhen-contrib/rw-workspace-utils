@@ -8,6 +8,8 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
+Library             OperatingSystem
+
 
 Suite Setup         Suite Initialization
 *** Tasks ***
@@ -17,7 +19,7 @@ Check for CodeCollection Updates against ACR Registry`${REGISTRY_NAME}`
     ${codecollection_images}=    RW.CLI.Run Bash File
     ...    bash_file=rwl_codecollection_updates.sh
     ...    env=${env}
-    ...    timeout_seconds=240
+    ...    timeout_seconds=300
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
 
@@ -28,9 +30,27 @@ Check for CodeCollection Updates against ACR Registry`${REGISTRY_NAME}`
 
     Set Global Variable    ${outdated_codecollection_images}    ${image_update_count.stdout}
 
+Check for RunWhen Local Image Updates against ACR Registry`${REGISTRY_NAME}`
+    [Documentation]    Count the number of RunWhen Local image upates that need to be synced internally to the private registry. 
+    [Tags]    acr    update    codecollection    utility
+    ${runwhen_local_images}=    RW.CLI.Run Bash File
+    ...    bash_file=rwl_helm_image_updates.sh
+    ...    cmd_override=./rwl_helm_image_updates.sh https://runwhen-contrib.github.io/helm-charts runwhen-contrib runwhen-local 
+    ...    env=${env}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=false
 
-Add Up Images and Push Metric
-    ${total_images}=      Evaluate  (${outdated_codecollection_images})
+    ${image_update_count}=    RW.CLI.Run Cli
+    ...    cmd=cat ${OUTPUT DIR}/azure-rw-acr-sync/images_to_update.json | jq 'to_entries | map(select(.value.update_required == true)) | from_entries | length '| tr -d '\n'
+    ...    env=${env}
+    ...    include_in_history=false
+
+    Set Global Variable    ${outdated_runwhen_local_images}    ${image_update_count.stdout}
+
+
+Count Images Needing Update and Push Metric
+    ${total_images}=      Evaluate  (${outdated_codecollection_images}+${outdated_runwhen_local_images})
     RW.Core.Push Metric    ${total_images}
 
 *** Keywords ***
@@ -41,6 +61,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=myacr.azurecr.io
     ...    default=myacr.azurecr.io
+    ${REGISTRY_REPOSITORY_PATH}=    RW.Core.Import User Variable    REGISTRY_REPOSITORY_PATH
+    ...    type=string
+    ...    description=The name root path of the repository for image storage.   
+    ...    pattern=\w*
+    ...    example=runwhen
+    ...    default=runwhen
     Set Suite Variable    ${DOCKER_USERNAME}    ""
     Set Suite Variable    ${DOCKER_TOKEN}    ""
     ${USE_DOCKER_AUTH}=    RW.Core.Import User Variable
@@ -58,10 +84,11 @@ Suite Initialization
     ...    type=string
     ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
     ...    pattern=\w*
-
+    Set Suite Variable     ${REGISTRY_REPOSITORY_PATH}    ${REGISTRY_REPOSITORY_PATH}
+    Set Suite Variable     ${REGISTRY_NAME}    ${REGISTRY_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync"}
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
 
 
 Import Docker Secrets

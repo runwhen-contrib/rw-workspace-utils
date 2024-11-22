@@ -1,23 +1,29 @@
 #!/bin/bash
 
-set -euo pipefail
+# set -euo pipefail
 
 # Base Variables
 HELM_REPO_URL=$1   # Helm repository URL
 HELM_REPO_NAME=$2  # Helm repository name
 HELM_CHART_NAME=$3 # Helm chart name
-WORKDIR=${WORKDIR:-"./helm_work"}  # Output directory for all temporary files
+export WORKDIR=${WORKDIR:-"./helm_work"}  # Output directory for all temporary files
 OUTPUT_JSON="$WORKDIR/images_to_update.json"
 RENDERED_YAML="$WORKDIR/rendered_chart.yaml"
 REGISTRIES_TXT="$WORKDIR/registries.txt"
 USE_DATE_TAG=${USE_DATE_TAG:-false} # Default is to not use date-based tags
 DATE_TAG=${DATE_TAG:-$(date +%Y%m%d%H%M%S)} # Default date tag if enabled
+# Ensure Helm cache and repositories are correctly set
+
+export HELM_CACHE_HOME="$TMPDIR/helm"
+export HELM_CONFIG_HOME="/$TMPDIR/helm/config"
+export HELM_DATA_HOME="$TMPDIR/helm/data"
+
 
 # Registry-specific variables
 REGISTRY_TYPE=${REGISTRY_TYPE:-"acr"} # Default to ACR, can be "acr", "artifactory", "gcr", etc.
-REGISTRY_NAME=${REGISTRY_NAME:-""} # Generic registry name
-REGISTRY_URL="" # Registry URL/endpoint
-REGISTRY_REPOSITORY_PATH=${REGISTRY_REPOSITORY_PATH:-""} # Root path in registry
+export REGISTRY_NAME=${REGISTRY_NAME:-""} # Generic registry name
+export REGISTRY_URL="" # Registry URL/endpoint
+export REGISTRY_REPOSITORY_PATH=${REGISTRY_REPOSITORY_PATH:-""} # Root path in registry
 SYNC_IMAGES=${SYNC_IMAGES:-false} # Whether to sync images
 
 # Authentication variables
@@ -179,7 +185,6 @@ function get_latest_chart_version() {
     local repo_name=$1
     local chart_name=$2
 
-    echo "Fetching latest chart version for $chart_name from $repo_name..." >&2
     latest_version=$(helm search repo "$repo_name/$chart_name" --output json | jq -r '.[0].version')
     
     if [[ -z "$latest_version" ]]; then
@@ -199,16 +204,25 @@ function add_dependencies_repos() {
         return
     fi
 
+    # Loop through dependencies and extract repository URLs
     yq eval '.dependencies[] | .repository' "$chart_dir/Chart.yaml" | while read -r repo; do
         if [[ -n "$repo" ]]; then
-            repo_name=$(echo "$repo" | awk -F'/' '{print $3}' | sed 's/[:.]//g')
-            echo "Adding Helm repository: $repo_name with URL: $repo"
-            helm repo add "$repo_name" "$repo" || true
+            # Check if the repository is already added
+            if helm repo list | grep -q "$repo"; then
+                echo "Repository with URL $repo is already added. Skipping..."
+            else
+                echo "Adding Helm repository with URL: $repo"
+                helm repo add "$(basename "$repo")" "$repo" || true
+            fi
         fi
     done
+
+    # Update all Helm repositories
     echo "Updating Helm repositories for dependencies..."
     helm repo update
 }
+
+
 
 function pull_and_render_chart() {
     local repo_name=$1
@@ -235,8 +249,13 @@ function pull_and_render_chart() {
     fi
 
     echo "Building Helm dependencies for $chart_name..."
+    env > "$WORKDIR/debug_env.txt"
+    echo "Current PATH: $PATH" >> "$WORKDIR/debug_env.log"
+    helm repo list > "$WORKDIR/debug_helm.txt"
+    ls -l "$WORKDIR" > "$WORKDIR/debug_ls.txt"
+
     pushd "$chart_dir" > /dev/null
-    helm dependency build || { echo "Failed to build dependencies for $chart_name. Exiting."; exit 1; }
+    helm dependency build --debug # || { echo "Failed to build dependencies for $chart_name. Exiting."; exit 1; }
     popd > /dev/null
 
     echo "Rendering Helm chart to YAML..."
@@ -284,9 +303,10 @@ function get_image_metadata() {
     local image=$1
     # Fetch metadata using skopeo
     metadata=$(skopeo inspect docker://${image} | jq .)
+    
     # Validate JSON structure
     if ! echo "$metadata" | jq empty; then
-        echo "Error: Invalid metadata retrieved for image: $image"
+        echo "Error: Invalid metadata retrieved for image: $image" >&2
         echo "{}"  # Return an empty JSON object
     else
         echo "$metadata"
@@ -324,11 +344,9 @@ function compare_image_dates() {
 function list_private_tags() {
     local private_repo=$1
 
-    echo "Listing tags for repository: $private_repo"
     tags=$(az acr repository show-tags --name "$REGISTRY_NAME" --repository "$private_repo" --orderby time_desc --output json 2>/dev/null || echo "[]")
-
     if ! echo "$tags" | jq empty; then
-        echo "Error: Unable to list tags for repository: $private_repo"
+        echo "Error: Unable to list tags for repository: $private_repo" >&2
         echo "[]"
     else
         echo "$tags"
@@ -342,7 +360,6 @@ function get_recent_tag_metadata() {
     for tag in $recent_tags; do
         local private_image="${REGISTRY_URL}/${private_repo}:${tag}"
         metadata=$(get_image_metadata "$private_image")
-        
         # Validate metadata and return if it's valid
         if [[ -n "$(echo "$metadata" | jq -r '.Created // empty')" ]]; then
             echo "$metadata"
@@ -367,7 +384,6 @@ function check_for_updates() {
         upstream_repo=$(echo "$qualified_upstream_image" | awk -F: '{print $1}')
         upstream_tag=$(echo "$qualified_upstream_image" | awk -F: '{print $2}')
         private_repo="${REGISTRY_REPOSITORY_PATH:+$REGISTRY_REPOSITORY_PATH/}$(basename "$upstream_repo")"
-
         echo "Fetching metadata for upstream image: $qualified_upstream_image"
         upstream_metadata=$(get_image_metadata "$qualified_upstream_image")
 
