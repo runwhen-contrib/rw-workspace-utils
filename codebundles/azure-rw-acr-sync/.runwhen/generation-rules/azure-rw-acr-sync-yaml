@@ -3,7 +3,7 @@ kind: GenerationRules
 spec:
   generationRules:
   - resourceTypes:
-    - variables
+    - deployment
     matchRules:
       - type: and
         matches:
@@ -13,9 +13,8 @@ spec:
           properties: [custom/private_registry]
           mode: substring
         - type: pattern
-          resourceType: variables
-          pattern: "."
-          properties: [custom/acr_registry]
+          pattern: "runner"
+          properties: [name]
           mode: substring
     slxs:
     - baseName: rw-acr-sync
