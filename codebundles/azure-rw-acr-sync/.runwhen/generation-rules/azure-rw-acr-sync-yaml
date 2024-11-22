@@ -7,11 +7,13 @@ spec:
     matchRules:
       - type: and
         matches:
-        - type: pattern
+        - resourceType: variables
+          type: pattern
           pattern: "acr"
           properties: [custom/private_registry]
           mode: substring
         - type: pattern
+          resourceType: variables
           pattern: "."
           properties: [custom/acr_registry]
           mode: substring
