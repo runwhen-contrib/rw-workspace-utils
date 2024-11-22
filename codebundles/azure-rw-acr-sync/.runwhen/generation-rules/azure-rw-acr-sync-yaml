@@ -3,16 +3,16 @@ kind: GenerationRules
 spec:
   generationRules:
   - resourceTypes:
-    - cluster
+    - deployment
     matchRules:
     - type: pattern
-      pattern: "."
+      pattern: "runner"
       properties: [name]
       mode: substring
     slxs:
     - baseName: rw-acr-sync
       levelOfDetail: detailed
-      qualifiers: ["workspace"]
+      qualifiers: ["namespace"]
       baseTemplateName: azure-rw-acr-sync
       outputItems:
         - type: slx
