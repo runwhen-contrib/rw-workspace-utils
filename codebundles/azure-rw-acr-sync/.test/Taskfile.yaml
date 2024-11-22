@@ -94,6 +94,9 @@ tasks:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
+        custom: 
+          private_registry: acr
+          acr_registry: runwhensandboxacr
         EOF
     silent: true
 
