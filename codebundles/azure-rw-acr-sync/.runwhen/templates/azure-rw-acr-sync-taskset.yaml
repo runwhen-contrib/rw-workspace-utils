@@ -28,7 +28,7 @@ spec:
     - name: USE_DOCKER_AUTH
       value: "false"
     - name: SYNC_IMAGES
-      value: "false"
+      value: "true"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
