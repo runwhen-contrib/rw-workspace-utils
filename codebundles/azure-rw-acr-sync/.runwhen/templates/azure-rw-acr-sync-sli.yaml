@@ -28,7 +28,7 @@ spec:
   intervalSeconds: 600
   configProvided:
     - name: REGISTRY_NAME
-      value: {{custom.azure_acr_registry}}
+      value: "{{custom.azure_acr_registry}}"
     - name: REGISTRY_REPOSITORY_PATH
       value: "runwhen"
     - name: USE_DOCKER_AUTH
