@@ -71,6 +71,12 @@ Suite Initialization
     ...    pattern=\w*
     ...    example=runwhen
     ...    default=runwhen
+    ${SYNC_IMAGES}=    RW.Core.Import User Variable    SYNC_IMAGES
+    ...    type=string
+    ...    description=Set to true to sync images. If false, only a report is generated. 
+    ...    pattern=\w*
+    ...    example=true
+    ...    default=true
     Set Suite Variable    ${DOCKER_USERNAME}    ""
     Set Suite Variable    ${DOCKER_TOKEN}    ""
     ${USE_DOCKER_AUTH}=    RW.Core.Import User Variable
@@ -92,7 +98,7 @@ Suite Initialization
     Set Suite Variable     ${REGISTRY_NAME}    ${REGISTRY_NAME}
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "SYNC_IMAGES":"${SYNC_IMAGES}"}
 
 
 Import Docker Secrets
