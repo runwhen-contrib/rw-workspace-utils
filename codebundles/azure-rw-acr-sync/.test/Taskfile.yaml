@@ -11,30 +11,12 @@ tasks:
   clean:
     desc: "Run cleanup tasks"
     cmds:
-      - task: remove-kubernetes-objects
       - task: delete-slxs
       - task: clean-rwl-discovery
 
   build-infra:
     desc: "Build test infrastructure"
     cmds:
-      - task: create-kubernetes-objects
-
-  create-kubernetes-objects:
-    desc: "Apply manifests from kubernetes directory using kubectl"
-    cmds: 
-     - |
-        #KUBECONFIG=$(echo $RW_FROM_FILE | jq -r  .kubeconfig)
-        kubectl apply -f kubernetes/*
-    silent: true
-
-  remove-kubernetes-objects:
-    desc: "Delete kubernetes objects"
-    cmds: 
-     - |
-        #KUBECONFIG=$(echo $RW_FROM_FILE | jq -r  .kubeconfig)
-        kubectl delete -f kubernetes/*
-    silent: true
 
 
   check-unpushed-commits:
@@ -78,6 +60,10 @@ tasks:
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
     env:
+      ARM_SUBSCRIPTION_ID: "{{.ARM_SUBSCRIPTION_ID}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
       RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
     cmds:
       - |
@@ -85,27 +71,29 @@ tasks:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         codebundle=$(basename "$(dirname "$PWD")")
 
-        namespace=$(yq e 'select(.kind == "Namespace") | .metadata.name' kubernetes/mainfest.yaml -N)
         # Generate workspaceInfo.yaml with fetched cluster details
         cat <<EOF > workspaceInfo.yaml
         workspaceName: "$RW_WORKSPACE"
         workspaceOwnerEmail: authors@runwhen.com
         defaultLocation: location-01
-        defaultLOD: none
+        defaultLOD: detailed
         cloudConfig:
-          kubernetes: 
-            kubeconfigFile: /shared/kubeconfig
-            namespaceLODs: 
-              $namespace: detailed
-            namespaces: 
-              - $namespace
+          azure:
+            subscriptionId: "$ARM_SUBSCRIPTION_ID"
+            tenantId: "$AZ_TENANT_ID"
+            clientId: "$AZ_CLIENT_ID"
+            clientSecret: "$AZ_CLIENT_SECRET"
+            aksClusters: 
+              clusters: 
+                - name: aks-cl-1
+                  server: https://aks-cl-1-v3g3ejjs.hcp.eastus.azmk8s.io:443
+                  resource_group: azure-aks-1
+              resourceGroupLevelOfDetails:
+                azure-aks-1: basic
         codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
-        custom:
-          kubeconfig_secret_name: "kubeconfig"
-          kubernetes_distribution_binary: kubectl
         EOF
     silent: true
 
@@ -132,7 +120,7 @@ tasks:
 
         kubeconfig=$(echo $RW_FROM_FILE | jq -r  .kubeconfig)
 
-        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -v $kubeconfig:/shared/kubeconfig -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
+        docker run --name $CONTAINER_NAME -p 8081:8081 -v "$(pwd)":/shared -d ghcr.io/runwhen-contrib/runwhen-local:latest || {
           echo "Failed to start container"; exit 1;
         }
 
