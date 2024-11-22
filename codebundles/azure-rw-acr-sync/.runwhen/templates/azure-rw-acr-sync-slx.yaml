@@ -8,7 +8,7 @@ metadata:
     {% include "common-annotations.yaml" %}
 spec:
   imageURL: https://storage.googleapis.com/runwhen-nonprod-shared-images/icons/runwhen_icon.png
-  alias: RunWhen Image Updates in ACR
+  alias: RunWhen Image Updates to ACR
   asMeasuredBy: Count of available updates
   configProvided:
   - name: OBJECT_NAME
