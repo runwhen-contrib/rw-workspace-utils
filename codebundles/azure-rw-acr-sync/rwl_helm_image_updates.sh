@@ -11,7 +11,7 @@ OUTPUT_JSON="$WORKDIR/images_to_update.json"
 RENDERED_YAML="$WORKDIR/rendered_chart.yaml"
 REGISTRIES_TXT="$WORKDIR/registries.txt"
 USE_DATE_TAG=${USE_DATE_TAG:-false} # Default is to not use date-based tags
-DATE_TAG=${DATE_TAG:-$(date +%Y%m%d%H%M%S)} # Default date tag if enabled
+export DATE_TAG=${DATE_TAG:-$(date +%Y%m%d%H%M%S)} # Default date tag if enabled
 # Ensure Helm cache and repositories are correctly set
 
 export HELM_CACHE_HOME="$TMPDIR/helm"
@@ -20,11 +20,11 @@ export HELM_DATA_HOME="$TMPDIR/helm/data"
 
 
 # Registry-specific variables
-REGISTRY_TYPE=${REGISTRY_TYPE:-"acr"} # Default to ACR, can be "acr", "artifactory", "gcr", etc.
+export REGISTRY_TYPE=${REGISTRY_TYPE:-"acr"} # Default to ACR, can be "acr", "artifactory", "gcr", etc.
 export REGISTRY_NAME=${REGISTRY_NAME:-""} # Generic registry name
 export REGISTRY_URL="" # Registry URL/endpoint
 export REGISTRY_REPOSITORY_PATH=${REGISTRY_REPOSITORY_PATH:-""} # Root path in registry
-SYNC_IMAGES=${SYNC_IMAGES:-false} # Whether to sync images
+export SYNC_IMAGES=${SYNC_IMAGES:-false} # Whether to sync images
 
 # Authentication variables
 REGISTRY_USERNAME=""
@@ -33,52 +33,50 @@ DOCKER_USERNAME=${DOCKER_USERNAME:-""} # Docker Hub username
 DOCKER_TOKEN=${DOCKER_TOKEN:-""} # Docker Hub token
 
 # Azure-specific variables
-AZURE_RESOURCE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID:-""}
+export AZURE_RESOURCE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID:-""}
 
-# Registry configuration function
-function configure_registry() {
-    case "$REGISTRY_TYPE" in
-        "acr")
-            if [[ -n "$REGISTRY_NAME" ]]; then
-                REGISTRY_NAME="${REGISTRY_NAME%.azurecr.io}" # Remove .azurecr.io if it exists
-                REGISTRY_URL="${REGISTRY_NAME}.azurecr.io"
-                REGISTRY_REPOSITORY_PATH=${REGISTRY_REPOSITORY_PATH:-""}
-                
-                # Set Azure subscription
-                if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
-                    subscription=$(az account show --query "id" -o tsv)
-                    echo "Using current subscription ID: $subscription"
-                else
-                    subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
-                    echo "Using specified subscription ID: $subscription"
-                fi
-                az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-                az acr login -n "$REGISTRY_URL" --expose-token
+# Registry configuration
+case "$REGISTRY_TYPE" in
+    "acr")
+        if [[ -n "$REGISTRY_NAME" ]]; then
+            REGISTRY_NAME="${REGISTRY_NAME%.azurecr.io}" # Remove .azurecr.io if it exists
+            REGISTRY_URL="${REGISTRY_NAME}.azurecr.io"
+            REGISTRY_REPOSITORY_PATH=${REGISTRY_REPOSITORY_PATH:-""}
+            
+            # Set Azure subscription
+            if [ -z "$AZURE_RESOURCE_SUBSCRIPTION_ID" ]; then
+                subscription=$(az account show --query "id" -o tsv)
+                echo "Using current subscription ID: $subscription"
             else
-                echo "Error: REGISTRY_NAME is not specified. Exiting."
-                exit 1
+                subscription="$AZURE_RESOURCE_SUBSCRIPTION_ID"
+                echo "Using specified subscription ID: $subscription"
             fi
-            ;;
-        "artifactory")
-            REGISTRY_NAME=${ARTIFACTORY_NAME:-""}
-            REGISTRY_URL=${ARTIFACTORY_URL:-""}
-            REGISTRY_REPOSITORY_PATH=${ARTIFACTORY_ROOT_PATH:-""}
-            REGISTRY_USERNAME=${ARTIFACTORY_USERNAME:-""}
-            REGISTRY_TOKEN=${ARTIFACTORY_TOKEN:-""}
-            # Add Artifactory-specific login logic here
-            ;;
-        "gcr")
-            REGISTRY_NAME=${GCR_NAME:-""}
-            REGISTRY_URL=${GCR_URL:-""}
-            REGISTRY_REPOSITORY_PATH=${GCR_ROOT_PATH:-""}
-            # Add GCR-specific login logic here
-            ;;
-        *)
-            echo "Error: Unsupported registry type: $REGISTRY_TYPE"
+            az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
+            az acr login -n "$REGISTRY_URL" 
+        else
+            echo "Error: REGISTRY_NAME is not specified. Exiting."
             exit 1
-            ;;
-    esac
-}
+        fi
+        ;;
+    "artifactory")
+        REGISTRY_NAME=${ARTIFACTORY_NAME:-""}
+        REGISTRY_URL=${ARTIFACTORY_URL:-""}
+        REGISTRY_REPOSITORY_PATH=${ARTIFACTORY_ROOT_PATH:-""}
+        REGISTRY_USERNAME=${ARTIFACTORY_USERNAME:-""}
+        REGISTRY_TOKEN=${ARTIFACTORY_TOKEN:-""}
+        # Add Artifactory-specific login logic here
+        ;;
+    "gcr")
+        REGISTRY_NAME=${GCR_NAME:-""}
+        REGISTRY_URL=${GCR_URL:-""}
+        REGISTRY_REPOSITORY_PATH=${GCR_ROOT_PATH:-""}
+        # Add GCR-specific login logic here
+        ;;
+    *)
+        echo "Error: Unsupported registry type: $REGISTRY_TYPE"
+        exit 1
+        ;;
+esac
 
 # Registry-specific image import functions
 function import_to_acr() {
@@ -474,8 +472,6 @@ helm version >/dev/null 2>&1 || { echo "Helm not installed. Exiting."; exit 1; }
 jq --version >/dev/null 2>&1 || { echo "jq not installed. Exiting."; exit 1; }
 skopeo --version >/dev/null 2>&1 || { echo "Skopeo not installed. Exiting."; exit 1; }
 
-# Configure registry before proceeding
-configure_registry
 
 # Create work directory
 rm -rf "$WORKDIR" && mkdir -p "$WORKDIR"

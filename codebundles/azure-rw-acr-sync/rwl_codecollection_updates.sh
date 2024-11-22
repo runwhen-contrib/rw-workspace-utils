@@ -35,8 +35,7 @@ if [[ -z "$docker_username" || -z "$docker_token" ]]; then
     echo "Warning: Docker credentials (DOCKER_USERNAME and DOCKER_TOKEN) should be set to avoid throttling."
 fi
 
-az acr login -n "$private_registry" --expose-token
-
+az acr login -n "$private_registry"
 codecollection_images=$(cat <<EOF
 {
     "us-west1-docker.pkg.dev/runwhen-nonprod-beta/public-images/runwhen-contrib-rw-cli-codecollection-main": {
@@ -163,7 +162,7 @@ tag_exists_in_acr() {
     fi
 
     # Then check if the tag exists
-    az acr repository show-manifests -n "$private_registry" --repository "$destination_image" \
+    az acr manifest list-metadata "$private_registry/$destination_image" \
         --query "[?tags[?@=='$destination_tag']]" | jq -e '. | length > 0' > /dev/null 2>&1
 
     if [ $? -eq 0 ]; then
