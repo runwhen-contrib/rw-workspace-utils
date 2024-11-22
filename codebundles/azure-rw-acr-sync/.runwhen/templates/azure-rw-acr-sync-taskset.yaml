@@ -21,16 +21,18 @@ spec:
     {% endif %}
     pathToRobot: codebundles/azure-rw-acr-sync/runbook.robot
   configProvided:
-    - name: KUBERNETES_DISTRIBUTION_BINARY
-      value: {{custom.kubernetes_distribution_binary}}
-    - name: NAMESPACE
-      value: {{match_resource.resource.metadata.namespace}}
-    - name: CONTEXT
-      value: {{context}}
+    - name: REGISTRY_NAME
+      value: {{custom.acr_name}}
+    - name: REGISTRY_REPOSITORY_PATH
+      value: "runwhen"
+    - name: USE_DOCKER_AUTH
+      value: "false"
+    - name: SYNC_IMAGES
+      value: "false"
   secretsProvided:
   {% if wb_version %}
-    {% include "kubernetes-auth.yaml" ignore missing %}
+    {% include "azure-auth.yaml" ignore missing %}
   {% else %}
-    - name: kubeconfig
-      workspaceKey: {{custom.kubeconfig_secret_name}}
+    - name: azure_credentials
+      workspaceKey: AUTH DETAILS NOT FOUND
   {% endif %}

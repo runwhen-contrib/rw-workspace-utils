@@ -17,4 +17,4 @@ spec:
   - {{workspace.owner_email}}
   statement: RunWhen images should be up to date in ACR
   additionalContext:  
-    cluster: "{{ cluster.name }}"
+    resource: "{{ resource }}"
