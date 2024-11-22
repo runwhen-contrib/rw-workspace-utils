@@ -1,0 +1,22 @@
+apiVersion: runwhen.com/v1
+kind: GenerationRules
+spec:
+  generationRules:
+  - resourceTypes:
+    - cluster
+    matchRules:
+    - type: pattern
+      pattern: "."
+      properties: [name]
+      mode: substring
+    slxs:
+    - baseName: rw-acr-sync
+      levelOfDetail: detailed
+      qualifiers: ["workspace"]
+      baseTemplateName: azure-rw-acr-sync
+      outputItems:
+        - type: slx
+        - type: sli
+        - type: runbook
+          templateName: azure-rw-acr-sync-taskset.yaml
+        - type: workflow

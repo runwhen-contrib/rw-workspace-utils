@@ -19,6 +19,8 @@ Check for CodeCollection Updates against ACR Registry`${REGISTRY_NAME}`
     ${codecollection_images}=    RW.CLI.Run Bash File
     ...    bash_file=rwl_codecollection_updates.sh
     ...    env=${env}
+    ...    secret__DOCKER_USERNAME=${DOCKER_USERNAME}
+    ...    secret__DOCKER_TOKEN=${DOCKER_TOKEN}
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
@@ -37,6 +39,8 @@ Check for RunWhen Local Image Updates against ACR Registry`${REGISTRY_NAME}`
     ...    bash_file=rwl_helm_image_updates.sh
     ...    cmd_override=./rwl_helm_image_updates.sh https://runwhen-contrib.github.io/helm-charts runwhen-contrib runwhen-local 
     ...    env=${env}
+    ...    secret__DOCKER_USERNAME=${DOCKER_USERNAME}
+    ...    secret__DOCKER_TOKEN=${DOCKER_TOKEN}
     ...    timeout_seconds=300
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
