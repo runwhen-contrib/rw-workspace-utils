@@ -411,65 +411,6 @@ function get_recent_tag_metadata() {
 }
 
 
-# function check_for_updates() {
-#     echo "Checking for updates to images..."
-#     echo "{}" > "$OUTPUT_JSON"
-
-#     while IFS= read -r upstream_image; do
-#         if [[ -z "$upstream_image" ]]; then
-#             continue
-#         fi
-
-#         qualified_upstream_image=$(qualify_image_path "$upstream_image")
-#         upstream_repo=$(echo "$qualified_upstream_image" | awk -F: '{print $1}')
-#         upstream_tag=$(echo "$qualified_upstream_image" | awk -F: '{print $2}')
-#         private_repo="${REGISTRY_REPOSITORY_PATH:+$REGISTRY_REPOSITORY_PATH/}$(basename "$upstream_repo")"
-#         echo "Fetching metadata for upstream image: $qualified_upstream_image"
-#         upstream_metadata=$(get_image_metadata "$qualified_upstream_image")
-
-#         if [[ -z "$(echo "$upstream_metadata" | jq -r '.Created // empty')" ]]; then
-#             echo "Error: Unable to fetch metadata for upstream image: $qualified_upstream_image"
-#             continue
-#         fi
-
-#         echo "Fetching metadata for recent private tags in: $private_repo"
-#         recent_tags=$(list_private_tags "$private_repo")
-#         tags=$(echo "$recent_tags" | sed -n '/^\[/,/\]$/p' | tr -d '[],"' | tr -s ' ' '\n')
-#         private_metadata="{}"
-
-#         for tag in $tags; do
-#             private_image="${REGISTRY_URL}/${private_repo}:${tag}"
-#             private_metadata=$(get_image_metadata "$private_image")
-
-#             if [[ -n "$(echo "$private_metadata" | jq -r '.Created // empty')" ]]; then
-#                 break
-#             fi
-#         done
-
-#         if [[ "$(echo "$private_metadata" | jq -r '.Created // empty')" == "" ]]; then
-#             echo "No valid metadata found for private tags. Assuming update required."
-#             update_required="true"
-#         else
-#             echo "Comparing image creation dates..."
-#             if compare_image_dates "$upstream_metadata" "$private_metadata"; then
-#                 update_required="true"
-#             else
-#                 update_required="false"
-#             fi
-#         fi
-
-#         private_image="${REGISTRY_URL}/${private_repo}:$(echo "$private_metadata" | jq -r '.Tag // empty')"
-
-#         jq --arg upstream_image "$qualified_upstream_image" \
-#            --arg private_image "$private_image" \
-#            --argjson update_required "$update_required" \
-#            '. + {($upstream_image): {private_image: $private_image, update_required: $update_required}}' \
-#            "$OUTPUT_JSON" > "$OUTPUT_JSON.tmp" && mv "$OUTPUT_JSON.tmp" "$OUTPUT_JSON"
-#     done < "$REGISTRIES_TXT"
-
-#     echo "Updates written to $OUTPUT_JSON."
-# }
-
 function check_for_updates() {
     echo "Checking for updates to images..."
     echo "{}" > "$OUTPUT_JSON"
