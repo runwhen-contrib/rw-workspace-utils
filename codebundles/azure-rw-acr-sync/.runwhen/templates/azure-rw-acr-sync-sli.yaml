@@ -35,6 +35,8 @@ spec:
       value: "false"
     - name: SYNC_IMAGES
       value: "false"
+    - name: USE_DATE_TAG
+      value: "true"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
@@ -44,6 +46,6 @@ spec:
   {% endif %}
   alerts:
     warning:
-      operator: >
+      operator: ">="
       threshold: '1'
-      for: '5m'
+      for: ''

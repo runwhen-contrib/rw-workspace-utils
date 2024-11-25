@@ -29,6 +29,8 @@ spec:
       value: "false"
     - name: SYNC_IMAGES
       value: "true"
+    - name: USE_DATE_TAG
+      value: "true"
   secretsProvided:
   {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
