@@ -105,7 +105,7 @@ Suite Initialization
     Set Suite Variable     ${USE_DATE_TAG}    ${USE_DATE_TAG}
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "SYNC_IMAGES":"${SYNC_IMAGES}"}
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "KUBECONFIG":"./${kubeconfig.key}"}
 
 
 Import Docker Secrets

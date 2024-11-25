@@ -59,12 +59,28 @@ Count Images Needing Update and Push Metric
 
 *** Keywords ***
 Suite Initialization
+    ${kubeconfig}=    RW.Core.Import Secret
+    ...    kubeconfig
+    ...    type=string
+    ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
+    ...    pattern=\w*
+    ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
+    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
+
     ${USE_DATE_TAG}=    RW.Core.Import User Variable    USE_DATE_TAG
     ...    type=string
     ...    description=Set to true in order to generate a unique date base tag. Useful if it is not possible to overwrite the latest tag.  
     ...    pattern=\w*
     ...    example=true
     ...    default=false
+    ${SYNC_IMAGES}=    RW.Core.Import User Variable   SYNC_IMAGES
+    ...    type=string
+    ...    description=Set to true in order to update the images in the private registry.   
+    ...    pattern=\w*
+    ...    example=true
+    ...    default=false
+    Set Suite Variable     ${SYNC_IMAGES}    ${SYNC_IMAGES}
+
     ${REGISTRY_NAME}=    RW.Core.Import User Variable    REGISTRY_NAME
     ...    type=string
     ...    description=The name of the Azure Container Registry to import images into. 
@@ -100,8 +116,7 @@ Suite Initialization
 
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
-
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "KUBECONFIG":"./${kubeconfig.key}"}
 
 Import Docker Secrets
     ${DOCKER_USERNAME}=    RW.Core.Import Secret

@@ -287,17 +287,31 @@ function qualify_image_path() {
 
 function extract_images() {
     echo "Extracting image configurations from rendered YAML..."
-    > "$REGISTRIES_TXT"
-    while IFS= read -r image; do
-        qualified_image=$(qualify_image_path "$image")
-        echo "$qualified_image" >> "$REGISTRIES_TXT"
-    done < <(grep -E "image:|\"image:" "$RENDERED_YAML" | sed -e 's/.*image: *//' -e 's/^"//' -e 's/"$//')
 
+    > "$REGISTRIES_TXT"
+    > "$WORKDIR/image_paths.txt"
+
+    # Extract "image:" entries from the rendered YAML
+    while IFS= read -r line; do
+        # Match lines with `image:` and clean them
+        if [[ "$line" =~ image: ]]; then
+            # Trim spaces and quotes
+            raw_image=$(echo "$line" | sed -E 's/.*image:[[:space:]]*"?([^"]+)"?/\1/')
+            qualified_image=$(qualify_image_path "$raw_image")
+
+            # Add to registries list
+            echo "$qualified_image" >> "$REGISTRIES_TXT"
+        fi
+    done < "$RENDERED_YAML"
+
+    # Ensure unique images
     sort -u "$REGISTRIES_TXT" -o "$REGISTRIES_TXT"
 
-    echo "Images extracted and qualified:"
+    echo "Extracted images:"
     cat "$REGISTRIES_TXT"
 }
+
+
 
 function get_image_metadata() {
     local image=$1
@@ -397,6 +411,65 @@ function get_recent_tag_metadata() {
 }
 
 
+# function check_for_updates() {
+#     echo "Checking for updates to images..."
+#     echo "{}" > "$OUTPUT_JSON"
+
+#     while IFS= read -r upstream_image; do
+#         if [[ -z "$upstream_image" ]]; then
+#             continue
+#         fi
+
+#         qualified_upstream_image=$(qualify_image_path "$upstream_image")
+#         upstream_repo=$(echo "$qualified_upstream_image" | awk -F: '{print $1}')
+#         upstream_tag=$(echo "$qualified_upstream_image" | awk -F: '{print $2}')
+#         private_repo="${REGISTRY_REPOSITORY_PATH:+$REGISTRY_REPOSITORY_PATH/}$(basename "$upstream_repo")"
+#         echo "Fetching metadata for upstream image: $qualified_upstream_image"
+#         upstream_metadata=$(get_image_metadata "$qualified_upstream_image")
+
+#         if [[ -z "$(echo "$upstream_metadata" | jq -r '.Created // empty')" ]]; then
+#             echo "Error: Unable to fetch metadata for upstream image: $qualified_upstream_image"
+#             continue
+#         fi
+
+#         echo "Fetching metadata for recent private tags in: $private_repo"
+#         recent_tags=$(list_private_tags "$private_repo")
+#         tags=$(echo "$recent_tags" | sed -n '/^\[/,/\]$/p' | tr -d '[],"' | tr -s ' ' '\n')
+#         private_metadata="{}"
+
+#         for tag in $tags; do
+#             private_image="${REGISTRY_URL}/${private_repo}:${tag}"
+#             private_metadata=$(get_image_metadata "$private_image")
+
+#             if [[ -n "$(echo "$private_metadata" | jq -r '.Created // empty')" ]]; then
+#                 break
+#             fi
+#         done
+
+#         if [[ "$(echo "$private_metadata" | jq -r '.Created // empty')" == "" ]]; then
+#             echo "No valid metadata found for private tags. Assuming update required."
+#             update_required="true"
+#         else
+#             echo "Comparing image creation dates..."
+#             if compare_image_dates "$upstream_metadata" "$private_metadata"; then
+#                 update_required="true"
+#             else
+#                 update_required="false"
+#             fi
+#         fi
+
+#         private_image="${REGISTRY_URL}/${private_repo}:$(echo "$private_metadata" | jq -r '.Tag // empty')"
+
+#         jq --arg upstream_image "$qualified_upstream_image" \
+#            --arg private_image "$private_image" \
+#            --argjson update_required "$update_required" \
+#            '. + {($upstream_image): {private_image: $private_image, update_required: $update_required}}' \
+#            "$OUTPUT_JSON" > "$OUTPUT_JSON.tmp" && mv "$OUTPUT_JSON.tmp" "$OUTPUT_JSON"
+#     done < "$REGISTRIES_TXT"
+
+#     echo "Updates written to $OUTPUT_JSON."
+# }
+
 function check_for_updates() {
     echo "Checking for updates to images..."
     echo "{}" > "$OUTPUT_JSON"
@@ -410,6 +483,7 @@ function check_for_updates() {
         upstream_repo=$(echo "$qualified_upstream_image" | awk -F: '{print $1}')
         upstream_tag=$(echo "$qualified_upstream_image" | awk -F: '{print $2}')
         private_repo="${REGISTRY_REPOSITORY_PATH:+$REGISTRY_REPOSITORY_PATH/}$(basename "$upstream_repo")"
+
         echo "Fetching metadata for upstream image: $qualified_upstream_image"
         upstream_metadata=$(get_image_metadata "$qualified_upstream_image")
 
@@ -435,16 +509,16 @@ function check_for_updates() {
         if [[ "$(echo "$private_metadata" | jq -r '.Created // empty')" == "" ]]; then
             echo "No valid metadata found for private tags. Assuming update required."
             update_required="true"
+            private_image="${REGISTRY_URL}/${private_repo}:${upstream_tag}"  # Default to upstream tag
         else
             echo "Comparing image creation dates..."
             if compare_image_dates "$upstream_metadata" "$private_metadata"; then
                 update_required="true"
+                private_image="${REGISTRY_URL}/${private_repo}:${upstream_tag}"  # Use upstream tag if update needed
             else
                 update_required="false"
             fi
         fi
-
-        private_image="${REGISTRY_URL}/${private_repo}:$(echo "$private_metadata" | jq -r '.Tag // empty')"
 
         jq --arg upstream_image "$qualified_upstream_image" \
            --arg private_image "$private_image" \
@@ -457,8 +531,6 @@ function check_for_updates() {
 }
 
 
-
-
 function sync_images_to_registry() {
     if [[ "$SYNC_IMAGES" != "true" ]]; then
         echo "SYNC_IMAGES is not enabled. Skipping sync."
@@ -466,34 +538,46 @@ function sync_images_to_registry() {
     fi
 
     echo "Importing images into registry..."
-    while IFS= read -r upstream_image; do
-        if [[ -z "$upstream_image" ]]; then
+
+    jq -r 'to_entries[] | select(.value.update_required == true) | "\(.key)=\(.value.private_image)"' "$OUTPUT_JSON" | while IFS= read -r line; do
+        if [[ -z "$line" ]]; then
             continue
         fi
 
-        qualified_upstream_image=$(qualify_image_path "$upstream_image")
-        upstream_repo=$(echo "$qualified_upstream_image" | awk -F: '{print $1}')
-        upstream_tag=$(echo "$qualified_upstream_image" | awk -F: '{print $2}')
+        upstream_image=$(echo "$line" | awk -F= '{print $1}')
+        private_image_base=$(echo "$line" | awk -F= '{print $2}')
 
+        upstream_repo=$(echo "$upstream_image" | awk -F: '{print $1}')
+        upstream_tag=$(echo "$upstream_image" | awk -F: '{print $2}')
+
+        target_repo="${REGISTRY_REPOSITORY_PATH:+$REGISTRY_REPOSITORY_PATH/}$(basename "$upstream_repo")"
         target_tag="$upstream_tag"
+
         if [[ "$target_tag" == "latest" && "$USE_DATE_TAG" == "true" ]]; then
             target_tag="$DATE_TAG"
             echo "Replacing 'latest' tag with date-based tag: $target_tag"
         fi
 
-        private_repo="${REGISTRY_REPOSITORY_PATH:+$REGISTRY_REPOSITORY_PATH/}$(basename "$upstream_repo")"
-        private_image="${REGISTRY_URL}/${private_repo}:${target_tag}"
+        private_image="${private_image_base}${target_tag}"
 
-        echo "Importing $qualified_upstream_image into $private_image..."
-        import_image "$qualified_upstream_image" "$private_repo" "$target_tag" || {
-            echo "Failed to import $qualified_upstream_image. Skipping."
+        echo "Importing $upstream_image into $private_image..."
+        import_image "$upstream_image" "$target_repo" "$target_tag" || {
+            echo "Failed to import $upstream_image. Skipping."
             continue
         }
-        echo "Successfully imported $qualified_upstream_image into $private_image."
-    done < "$REGISTRIES_TXT"
+        echo "Successfully imported $upstream_image into $private_image."
+
+        # Update the JSON to reflect the new tag
+        jq --arg upstream_image "$upstream_image" \
+           --arg private_image "$private_image" \
+           --argjson update_required false \
+           '.[$upstream_image].private_image = $private_image | .[$upstream_image].update_required = $update_required' \
+           "$OUTPUT_JSON" > "$OUTPUT_JSON.tmp" && mv "$OUTPUT_JSON.tmp" "$OUTPUT_JSON"
+    done
 
     echo "Image synchronization to registry completed."
 }
+
 
 # Main Execution
 helm version >/dev/null 2>&1 || { echo "Helm not installed. Exiting."; exit 1; }
@@ -510,3 +594,4 @@ pull_and_render_chart "$HELM_REPO_NAME" "$HELM_CHART_NAME" "$latest_version"
 extract_images
 check_for_updates
 sync_images_to_registry
+

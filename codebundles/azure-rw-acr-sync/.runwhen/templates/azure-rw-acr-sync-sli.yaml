@@ -34,7 +34,7 @@ spec:
     - name: USE_DOCKER_AUTH
       value: "false"
     - name: SYNC_IMAGES
-      value: "false"
+      value: "true"
     - name: USE_DATE_TAG
       value: "true"
   secretsProvided:
