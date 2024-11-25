@@ -59,14 +59,6 @@ Count Images Needing Update and Push Metric
 
 *** Keywords ***
 Suite Initialization
-    ${kubeconfig}=    RW.Core.Import Secret
-    ...    kubeconfig
-    ...    type=string
-    ...    description=The kubernetes kubeconfig yaml containing connection configuration used to connect to cluster(s).
-    ...    pattern=\w*
-    ...    example=For examples, start here https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
-    Set Suite Variable    ${kubeconfig}    ${kubeconfig}
-
     ${USE_DATE_TAG}=    RW.Core.Import User Variable    USE_DATE_TAG
     ...    type=string
     ...    description=Set to true in order to generate a unique date base tag. Useful if it is not possible to overwrite the latest tag.  
@@ -116,7 +108,7 @@ Suite Initialization
 
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "KUBECONFIG":"./${kubeconfig.key}"}
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
 
 Import Docker Secrets
     ${DOCKER_USERNAME}=    RW.Core.Import Secret

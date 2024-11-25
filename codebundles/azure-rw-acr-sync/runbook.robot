@@ -40,22 +40,8 @@ Sync RunWhen Local Image Updates to ACR Registry`${REGISTRY_NAME}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
 
-
     RW.Core.Add Pre To Report    RunWhen Local Image Update Output:\n${runwhen_local_images.stdout}
 
-# Sync RunWhen Local Helm Images into ACR `${ACR_REGISTRY}`
-#     [Documentation]    Sync latest images for RunWhen into ACR
-#     [Tags]    azure    acr    registry    runwhen
-#     ${az_rw_acr_image_sync}=    RW.CLI.Run Bash File
-#     ...    bash_file=codebundles/azure-rw-acr-sync/sync_with_az_import.sh
-#     ...    env=${env}
-#     ...    include_in_history=False
-#     ...    secret__DOCKER_USERNAME=${DOCKER_USERNAME}
-#     ...    secret__DOCKER_TOKEN=${DOCKER_TOKEN}
-#     ...    timeout_seconds=1200
-#     ${helm_output}=    RW.CLI.Run CLI
-#     ...    cmd= cat ../updated_values.yaml
-#     RW.Core.Add Pre To Report    Updated Helm Values for RunWhen Local:\n${helm_output.stdout}
 
 *** Keywords ***
 Suite Initialization
@@ -105,7 +91,7 @@ Suite Initialization
     Set Suite Variable     ${USE_DATE_TAG}    ${USE_DATE_TAG}
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "KUBECONFIG":"./${kubeconfig.key}"}
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
 
 
 Import Docker Secrets
