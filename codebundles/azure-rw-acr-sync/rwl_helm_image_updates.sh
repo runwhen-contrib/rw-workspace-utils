@@ -36,6 +36,8 @@ DOCKER_TOKEN=${DOCKER_TOKEN:-""} # Docker Hub token
 export AZURE_RESOURCE_SUBSCRIPTION_ID=${AZURE_RESOURCE_SUBSCRIPTION_ID:-""}
 
 # Registry configuration
+# Note: this has been written for ACR and has some scaffolding in place to 
+# support other registries at a later date
 case "$REGISTRY_TYPE" in
     "acr")
         if [[ -n "$REGISTRY_NAME" ]]; then
@@ -52,7 +54,7 @@ case "$REGISTRY_TYPE" in
                 echo "Using specified subscription ID: $subscription"
             fi
             az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-            # az acr login -n "$REGISTRY_URL" 
+            TOKEN=$(az acr login -n "$REGISTRY_URL" --expose-token | jq -r .accessToken)
         else
             echo "Error: REGISTRY_NAME is not specified. Exiting."
             exit 1
@@ -299,17 +301,43 @@ function extract_images() {
 
 function get_image_metadata() {
     local image=$1
-    # Fetch metadata using skopeo
-    metadata=$(skopeo inspect docker://${image} | jq .)
-    
+    local registry=$(echo "$image" | awk -F/ '{print $1}') # Extract registry name from the image
+
+    case "$registry" in
+        *.azurecr.io)
+            metadata=$(skopeo inspect --creds "00000000-0000-0000-0000-000000000000:$TOKEN" docker://${image} 2>/dev/null || echo "{}")
+            ;;
+        docker.io)
+            # Docker Hub (Public Registry)
+            if [[ -n "$DOCKER_USERNAME" && -n "$DOCKER_TOKEN" ]]; then
+                metadata=$(skopeo inspect --creds "$DOCKER_USERNAME:$DOCKER_TOKEN" docker://${image} 2>/dev/null || echo "{}")
+            else
+                metadata=$(skopeo inspect docker://${image} 2>/dev/null || echo "{}")
+            fi
+            ;;
+        gcr.io | *.gcr.io)
+            # Google Container Registry (GCR)
+            if [[ -z "$GCR_TOKEN" ]]; then
+                echo "Authenticating with GCR..."
+                export GCR_TOKEN=$(gcloud auth print-access-token)
+            fi
+            metadata=$(skopeo inspect --creds "oauth2accesstoken:$GCR_TOKEN" docker://${image} 2>/dev/null || echo "{}")
+            ;;
+        *)
+            # Unsupported or unauthenticated registry
+            metadata=$(skopeo inspect docker://${image} 2>/dev/null || echo "{}")
+            ;;
+    esac
+
     # Validate JSON structure
-    if ! echo "$metadata" | jq empty; then
+    if ! echo "$metadata" | jq empty 2>/dev/null; then
         echo "Error: Invalid metadata retrieved for image: $image" >&2
         echo "{}"  # Return an empty JSON object
     else
         echo "$metadata"
     fi
 }
+
 
 function compare_image_dates() {
     local upstream_metadata=$1
