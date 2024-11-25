@@ -59,6 +59,12 @@ Sync RunWhen Local Image Updates to ACR Registry`${REGISTRY_NAME}`
 
 *** Keywords ***
 Suite Initialization
+    ${USE_DATE_TAG}=    RW.Core.Import User Variable    USE_DATE_TAG
+    ...    type=string
+    ...    description=Set to true in order to generate a unique date base tag. Useful if it is not possible to overwrite the latest tag.  
+    ...    pattern=\w*
+    ...    example=true
+    ...    default=false
     ${REGISTRY_NAME}=    RW.Core.Import User Variable    REGISTRY_NAME
     ...    type=string
     ...    description=The name of the Azure Container Registry to import images into. 
@@ -96,6 +102,7 @@ Suite Initialization
     ...    pattern=\w*
     Set Suite Variable     ${REGISTRY_REPOSITORY_PATH}    ${REGISTRY_REPOSITORY_PATH}
     Set Suite Variable     ${REGISTRY_NAME}    ${REGISTRY_NAME}
+    Set Suite Variable     ${USE_DATE_TAG}    ${USE_DATE_TAG}
     Set Suite Variable
     ...    ${env}
     ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "SYNC_IMAGES":"${SYNC_IMAGES}"}
