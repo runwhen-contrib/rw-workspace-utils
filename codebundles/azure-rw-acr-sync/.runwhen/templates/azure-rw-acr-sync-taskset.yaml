@@ -32,9 +32,6 @@ spec:
     - name: USE_DATE_TAG
       value: "true"
   secretsProvided:
-  {% if wb_version %}
     {% include "azure-auth.yaml" ignore missing %}
-  {% else %}
-    - name: azure_credentials
-      workspaceKey: AUTH DETAILS NOT FOUND
+    {% include "kubernetes-auth.yaml" ignore missing %}
   {% endif %}

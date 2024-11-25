@@ -86,7 +86,7 @@ tasks:
             aksClusters: 
               clusters: 
                 - name: aks-cl-1
-                  server: https://aks-cl-1-v3g3ejjs.hcp.eastus.azmk8s.io:443
+                  server: https://aks-cl-1-nftfei3p.hcp.eastus.azmk8s.io
                   resource_group: azure-aks-1
               resourceGroupLevelOfDetails:
                 azure-aks-1: basic
