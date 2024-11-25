@@ -26,7 +26,7 @@ Check for CodeCollection Updates against ACR Registry`${REGISTRY_NAME}`
     ...    show_in_rwl_cheatsheet=false
 
     ${image_update_count}=    RW.CLI.Run Cli
-    ...    cmd=cat ${OUTPUT DIR}/azure-rw-acr-sync/cc_images_to_update.json | jq 'if . == null or . == [] then 0 else length end' | tr -d '\n'
+    ...    cmd=[ -f "${OUTPUT_DIR}/azure-rw-acr-sync/cc_images_to_update.json" ] && cat "${OUTPUT_DIR}/azure-rw-acr-sync/cc_images_to_update.json" | jq 'if . == null or . == [] then 0 else length end' | tr -d '\n' || echo -n 0
     ...    env=${env}
     ...    include_in_history=false
 

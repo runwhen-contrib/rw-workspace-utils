@@ -7,8 +7,8 @@ metadata:
   annotations:
     {% include "common-annotations.yaml" %}
 spec:
-  displayUnitsLong: OK
-  displayUnitsShort: ok
+  displayUnitsLong: Count
+  displayUnitsShort: "#"
   locations:
     - {{default_location}}
   description: Counts the number of RW images that need updating in ACR
