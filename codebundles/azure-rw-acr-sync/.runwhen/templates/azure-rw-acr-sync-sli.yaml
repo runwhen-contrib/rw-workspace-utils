@@ -39,7 +39,6 @@ spec:
       value: "true"
   secretsProvided:
     {% include "azure-auth.yaml" ignore missing %}
-    {% include "kubernetes-auth.yaml" ignore missing %}
   alerts:
     warning:
       operator: ">="
