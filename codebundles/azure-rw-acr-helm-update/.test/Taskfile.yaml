@@ -71,7 +71,7 @@ tasks:
                   subscriptionId: $cluster_sub
             resourceGroupLevelOfDetails:
               $cluster_resource_group: detailed
-        codeCollections: []
+        codeCollections:
         - repoURL: "$repo_url"
           branch: "$branch_name"
           codeBundles: ["$codebundle"]
@@ -197,6 +197,60 @@ tasks:
         }
         echo "Terraform infrastructure cleanup completed."
     silent: true
+
+  install-rwl-helm:
+    desc: Install RunWhen Local components into cluster
+    env: 
+      ARM_SUBSCRIPTION_ID: "{{.TF_VAR_subscription_id_1}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RUNNER_TOKEN: "{{.RUNNER_TOKEN}}"
+    cmds: 
+     - | 
+        namespace=runwhen-local-beta
+        kubectl create namespace $namespace || true
+        kubectl create secret generic runner-registration-token --from-literal=token="$RUNNER_TOKEN" -n $namespace || true
+        kubectl create secret generic azure-sp \
+          --from-literal=clientId=$AZ_CLIENT_ID \
+          --from-literal=clientSecret=$AZ_CLIENT_SECRET \
+          --from-literal=subscriptionId=$ARM_SUBSCRIPTION_ID \
+          --from-literal=tenantId=$AZ_TENANT_ID \
+          --namespace=$namespace  || true
+        helm repo add runwhen-contrib https://runwhen-contrib.github.io/helm-charts
+        helm repo update
+        helm install runwhen-local runwhen-contrib/runwhen-local -f values.yaml -n $namespace
+    silent: true
+
+  delete-rwl-helm:
+    desc: Install RunWhen Local components into cluster
+    env: 
+      ARM_SUBSCRIPTION_ID: "{{.TF_VAR_subscription_id_1}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RUNNER_TOKEN: "{{.RUNNER_TOKEN}}"
+    cmds: 
+     - | 
+        namespace=runwhen-local-beta
+        kubectl delete namespace $namespace
+    silent: true
+
+  upgrade-rwl-helm:
+    desc: Install RunWhen Local components into cluster
+    env: 
+      ARM_SUBSCRIPTION_ID: "{{.TF_VAR_subscription_id_1}}"
+      AZ_TENANT_ID: "{{.AZ_TENANT_ID}}"
+      AZ_CLIENT_SECRET: "{{.AZ_CLIENT_SECRET}}"
+      AZ_CLIENT_ID: "{{.AZ_CLIENT_ID}}"
+      RW_WORKSPACE: '{{.RW_WORKSPACE | default "my-workspace"}}'
+      RUNNER_TOKEN: "{{.RUNNER_TOKEN}}"
+    cmds: 
+     - | 
+        namespace=runwhen-local-beta
+        helm upgrade runwhen-local runwhen-contrib/runwhen-local -f values.yaml -n $namespace
 
   check-and-cleanup-terraform:
     desc: "Check and clean up deployed Terraform infrastructure if it exists"
