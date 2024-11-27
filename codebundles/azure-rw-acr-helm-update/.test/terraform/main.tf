@@ -72,6 +72,12 @@ resource "azurerm_kubernetes_cluster" "cluster_aks" {
 
 # Separate Resource for Kubeconfig Retrieval
 resource "null_resource" "fetch_kubeconfig" {
+
+  # Triggers to ensure it runs every time
+  triggers = {
+    always_run = timestamp()
+  }
+
   provisioner "local-exec" {
     command = <<EOT
 az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.cluster_aks.name} --overwrite-existing

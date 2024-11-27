@@ -35,7 +35,7 @@ affinity: {}
 
 # Override the container image registry used for all images
 # Note: grafana-agent is a subchart and must still be explicitly updated.
-registryOverride: ""
+registryOverride: "runwhensandboxacr.azurecr.io"
 
 # Set proxy env for RunWhen Local and Runner Deployments and any supporting infrastructure such as the grafana-agent
 proxy:
@@ -71,11 +71,11 @@ platformArch: "amd64"
 runwhenLocal:
   enabled: true
   image:
-    registry: "us-docker.pkg.dev"
-    repository: "runwhen-nonprod-shared/public-images/runwhen-local"
+    registry: ""
+    repository: "runwhen/runwhen-local"
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    tag: "latest"
+    tag: "20241125153650"
     # registry: "ghcr.io"
     # repository: "runwhen-contrib/runwhen-local"
     # pullPolicy: Always
@@ -271,8 +271,8 @@ runner:
 
   image:
     registry: ""
-    repository: ""
-    tag: "latest"
+    repository: "runwhen/runner"
+    tag: "20241125152412"
   controlAddr: "https://runner.beta.runwhen.com"
   metrics:
     url: "https://runner-cortex-tenant.test.runwhen.com/push"
@@ -301,7 +301,7 @@ runner:
       pullSecret: ""
       pullPolicy: ""
       registry: ""
-      repository: ""
+      repository: "ruwhen"
     # volumes common for all the pods created by the runner
     volumes: {}
 
@@ -449,7 +449,7 @@ runner:
   pushgateway:
     image:
       registry: ""
-      repository: ""
+      repository: "runwhen/pushgateway"
       tag: "v1.10.0"
     tolerations: []
 
@@ -461,9 +461,9 @@ opentelemetry-collector:
     create: false
     existingName: "otel-collector"
   image:
-    repository: "otel/opentelemetry-collector"
+    repository: "runwhensandboxacr.azurecr.io/runwhen/opentelemetry-collector"
     pullPolicy: IfNotPresent
-    tag: "0.104.0"
+    tag: "0.110.0"
   imagePullSecrets: []
   command:
     name: "otelcol"
