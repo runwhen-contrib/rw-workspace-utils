@@ -7,7 +7,7 @@ HELM_RELEASE="${HELM_RELEASE:-runwhen-local}"  # Helm release name
 CONTEXT="${CONTEXT:-cluster1}"  # Kubernetes context to use
 MAPPING_FILE="../image_mappings.yaml"  # Generic mapping file
 HELM_APPLY_UPGRADE="${HELM_APPLY_UPGRADE:-false}"  # Set to "true" to apply upgrades
-REPOSITORY_ROOT_PATH="${REPOSITORY_ROOT_PATH:-runwhen}"  # Default repository root path
+REGISTRY_REPOSITORY_PATH="${REGISTRY_REPOSITORY_PATH:-runwhen}"  # Default repository root path
 
 HELM_REPO_URL="${HELM_REPO_URL:-https://runwhen-contrib.github.io/helm-charts}"
 HELM_REPO_NAME="${HELM_REPO_NAME:-runwhen-contrib}"
@@ -31,10 +31,10 @@ parse_image() {
     echo "$registry" "$repo" "$tag"
 }
 
-# Resolve ${REPOSITORY_ROOT_PATH}
-resolve_repository_root_path() {
+# Resolve ${REGISTRY_REPOSITORY_PATH}
+resolve_REGISTRY_REPOSITORY_PATH() {
     local input=$1
-    echo "$input" | sed "s|\$REPOSITORY_ROOT_PATH|$REPOSITORY_ROOT_PATH|g" | xargs
+    echo "$input" | sed "s|\$REGISTRY_REPOSITORY_PATH|$REGISTRY_REPOSITORY_PATH|g" | xargs
 }
 
 # Construct --set flags
@@ -45,7 +45,7 @@ construct_set_flags() {
     local resolved_mapping_file=$(mktemp)
 
     # Resolve placeholders in mapping file
-    sed "s|\$REPOSITORY_ROOT_PATH|$REPOSITORY_ROOT_PATH|g" "$mapping_file" > "$resolved_mapping_file"
+    sed "s|\$REGISTRY_REPOSITORY_PATH|$REGISTRY_REPOSITORY_PATH|g" "$mapping_file" > "$resolved_mapping_file"
 
     while IFS= read -r line; do
         repo=$(echo "$line" | awk '{print $1}')
@@ -55,7 +55,7 @@ construct_set_flags() {
             continue
         fi
 
-        normalized_repo=$(resolve_repository_root_path "$repo")
+        normalized_repo=$(resolve_REGISTRY_REPOSITORY_PATH "$repo")
         set_path=$(yq eval ".images[] | select(.image == \"$normalized_repo\") | .set_path" "$resolved_mapping_file" 2>/dev/null)
         if [[ -n "$set_path" ]]; then
             set_flags+="--set $set_path=$tag "

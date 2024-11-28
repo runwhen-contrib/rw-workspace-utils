@@ -44,7 +44,7 @@ Suite Initialization
     ...    type=string
     ...    description=The kubeconfig used to fetch the Helm release details
     ...    pattern=\w*
-    ${REPOSITORY_ROOT_PATH}=    RW.Core.Import User Variable    REPOSITORY_ROOT_PATH
+    ${REGISTRY_REPOSITORY_PATH}=    RW.Core.Import User Variable    REGISTRY_REPOSITORY_PATH
     ...    type=string
     ...    description=The name root path of the repository for image storage.   
     ...    pattern=\w*
@@ -76,4 +76,4 @@ Suite Initialization
     ...    default=runwhen-local
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "HELM_RELEASE":"${HELM_RELEASE}","REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-helm-update", "TMPDIR":"/var/tmp/runwhen", "NAMESPACE":"${NAMESPACE}","CONTEXT":"${CONTEXT}", "HELM_APPLY_UPGRADE":"${HELM_APPLY_UPGRADE}", "REPOSITORY_ROOT_PATH":"${REPOSITORY_ROOT_PATH}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "HELM_RELEASE":"${HELM_RELEASE}","REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-helm-update", "TMPDIR":"/var/tmp/runwhen", "NAMESPACE":"${NAMESPACE}","CONTEXT":"${CONTEXT}", "HELM_APPLY_UPGRADE":"${HELM_APPLY_UPGRADE}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
