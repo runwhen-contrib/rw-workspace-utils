@@ -1,130 +1,124 @@
 #!/bin/bash
 
-# Constants
-OUTPUT_DIR=/robot_logs/az
+# Variables
+REGISTRY_NAME="${REGISTRY_NAME:-runwhensandboxacr.azurecr.io}"  # Full Azure Container Registry URL
+NAMESPACE="${NAMESPACE:-runwhen-local-beta}"  # Kubernetes namespace
+HELM_RELEASE="${HELM_RELEASE:-runwhen-local}"  # Helm release name
+CONTEXT="${CONTEXT:-cluster1}"  # Kubernetes context to use
+MAPPING_FILE="../image_mappings.yaml"  # Generic mapping file
+HELM_APPLY_UPGRADE="${HELM_APPLY_UPGRADE:-false}"  # Set to "true" to apply upgrades
+REPOSITORY_ROOT_PATH="${REPOSITORY_ROOT_PATH:-runwhen}"  # Default repository root path
 
-HELM_RELEASE="runwhen-local"
-NAMESPACE="runwhen-local-beta"
-CLONE_DIR="$OUTPUT_DIR/helm-chart"
-RENDERED_MANIFESTS="$OUTPUT_DIR/rendered-manifests.yaml"
-OUTPUT_JSON="$OUTPUT_DIR/images_to_update.json"
-REGISTRY_LOGIN="runwhensandboxacr.azurecr.io"
+HELM_REPO_URL="${HELM_REPO_URL:-https://runwhen-contrib.github.io/helm-charts}"
+HELM_REPO_NAME="${HELM_REPO_NAME:-runwhen-contrib}"
+HELM_CHART_NAME="${HELM_CHART_NAME:-runwhen-local}"
+WORKDIR="${WORKDIR:-./helm_work}" 
 
-# Cleanup
-cleanup() {
-    rm -rf "$CLONE_DIR" "$RENDERED_MANIFESTS" "$OUTPUT_JSON"
-}
-trap cleanup EXIT
+# Clean temp update file
+rm -rf $WORKDIR || true
+mkdir -p $WORKDIR
 
-# Fetch Helm chart
-fetch_helm_chart() {
-    echo "Fetching Helm chart for release '$HELM_RELEASE'..."
-    mkdir -p "$CLONE_DIR"
-    helm pull runwhen-local --repo https://runwhen-contrib.github.io/helm-charts --untar --untardir "$CLONE_DIR"
-    if [[ $? -ne 0 ]]; then
-        echo "Failed to fetch Helm chart. Ensure it exists in the specified repo."
-        exit 1
-    fi
-    echo "Helm chart fetched successfully."
-}
 
-# Retrieve rendered manifests
-retrieve_rendered_manifests() {
-    echo "Retrieving rendered manifests for release '$HELM_RELEASE'..."
-    helm get manifest "$HELM_RELEASE" --namespace "$NAMESPACE" > "$RENDERED_MANIFESTS"
-    if [[ $? -ne 0 ]]; then
-        echo "Failed to retrieve rendered manifests. Ensure the release exists."
-        exit 1
-    fi
-    echo "Rendered manifests saved to $RENDERED_MANIFESTS."
-}
-
-# Parse images from templates and manifests
-parse_images() {
-    echo "Parsing images from templates and manifests..."
-
-    # Extract images from templates
-    echo "Processing templates..."
-    find "$CLONE_DIR" -type f -name "*.yaml" | while read -r file; do
-        yq eval '.. | select(has("image")) | .image' "$file" 2>/dev/null | grep -Eo '^[^:]+:[^"]+$' | while read -r image; do
-            echo "Found image in templates: $image"
-            images["$image"]="$file"
-        done
-    done
-
-    # Extract images from rendered manifests
-    echo "Processing rendered manifests..."
-    yq eval '.. | select(has("image")) | .image' "$RENDERED_MANIFESTS" 2>/dev/null | grep -Eo '^[^:]+:[^"]+$' | while read -r image; do
-        echo "Found image in manifests: $image"
-        images["$image"]="rendered"
-    done
-}
-
-# Validate image format
-is_valid_image() {
+# Function to parse image into components
+parse_image() {
     local image=$1
-    [[ $image =~ ^[a-zA-Z0-9.-]+/[a-zA-Z0-9._/-]+:[a-zA-Z0-9._-]+$ ]]
+    local registry repo tag
+
+    registry=$(echo "$image" | cut -d '/' -f 1)
+    repo=$(echo "$image" | cut -d '/' -f 2- | cut -d ':' -f 1)
+    tag=$(echo "$image" | awk -F ':' '{print $NF}')
+
+    echo "$registry" "$repo" "$tag"
 }
 
-# Check for newer tags in the registry
-check_for_newer_tags() {
-    echo "Checking for newer tags in registry '$REGISTRY'..."
-    for image in "${!images[@]}"; do
-        if ! is_valid_image "$image"; then
-            echo "Skipping invalid image: $image"
-            continue
-        fi
-
-        local registry repo tag
-        read -r registry repo tag <<<"$(echo "$image" | awk -F'[/:]' '{print $1, $2"/"$3, $NF}')"
-
-        if [[ $registry != $REGISTRY ]]; then
-            echo "Skipping non-registry image: $image"
-            continue
-        fi
-
-        echo "Checking repository $repo for newer tags..."
-        tags=$(az acr repository show-tags --name "${registry%%.*}" --repository "$repo" --query "[]" -o tsv 2>/dev/null)
-        if [[ $? -ne 0 || -z $tags ]]; then
-            echo "Failed to fetch tags for $repo."
-            continue
-        fi
-
-        for t in $tags; do
-            if [[ $t > $tag ]]; then
-                echo "Newer tag found for $image: $t"
-                images_to_update["$image"]="$t"
-                break
-            fi
-        done
-    done
+# Resolve ${REPOSITORY_ROOT_PATH}
+resolve_repository_root_path() {
+    local input=$1
+    echo "$input" | sed "s|\$REPOSITORY_ROOT_PATH|$REPOSITORY_ROOT_PATH|g" | xargs
 }
 
-# Generate upgrade commands
-generate_upgrade_commands() {
-    echo "Generating Helm upgrade commands..."
-    > "$OUTPUT_JSON"
+# Construct --set flags
+construct_set_flags() {
+    local mapping_file=$1
+    local updated_images=$2
+    local set_flags=""
+    local resolved_mapping_file=$(mktemp)
 
-    for image in "${!images_to_update[@]}"; do
-        new_tag=${images_to_update[$image]}
-        path=${images["$image"]}
-        echo "{\"image\": \"$image\", \"new_tag\": \"$new_tag\", \"path\": \"$path\"}" >> "$OUTPUT_JSON"
+    # Resolve placeholders in mapping file
+    sed "s|\$REPOSITORY_ROOT_PATH|$REPOSITORY_ROOT_PATH|g" "$mapping_file" > "$resolved_mapping_file"
 
-        if [[ -n $path && $path != "rendered" ]]; then
-            echo "helm upgrade $HELM_RELEASE $CLONE_DIR --namespace $NAMESPACE --reuse-values --set $path.image.tag=$new_tag"
+    while IFS= read -r line; do
+        repo=$(echo "$line" | awk '{print $1}')
+        tag=$(echo "$line" | awk '{print $2}')
+
+        if [[ -z "$repo" || -z "$tag" ]]; then
+            continue
+        fi
+
+        normalized_repo=$(resolve_repository_root_path "$repo")
+        set_path=$(yq eval ".images[] | select(.image == \"$normalized_repo\") | .set_path" "$resolved_mapping_file" 2>/dev/null)
+        if [[ -n "$set_path" ]]; then
+            set_flags+="--set $set_path=$tag "
         else
-            echo "Rendered manifest images cannot be dynamically updated via Helm."
+            echo "No mapping found for repository '$normalized_repo'. Skipping."
         fi
-    done
+    done <<< "$updated_images"
+
+    # Cleanup
+    rm -f "$resolved_mapping_file"
+
+    echo "$set_flags"
 }
 
-# Main logic
-fetch_helm_chart
-retrieve_rendered_manifests
-declare -A images
-declare -A images_to_update
-parse_images
-check_for_newer_tags
-generate_upgrade_commands
+# Main script logic
+echo "Extracting images for Helm release '$HELM_RELEASE' in namespace '$NAMESPACE' on context '$CONTEXT'..."
 
-echo "Image update checks complete. Results saved to $OUTPUT_JSON."
+helm_images=$(helm get manifest "$HELM_RELEASE" -n "$NAMESPACE" --kube-context "$CONTEXT" | grep -oP '(?<=image: ).*' | sed 's/"//g' | sort -u)
+kubectl_images=$(kubectl get pods -n "$NAMESPACE" --context "$CONTEXT" -o json | jq -r '.items[].spec.containers[].image' | sort -u)
+
+# Combine and deduplicate images
+all_images=$(echo -e "$helm_images\n$kubectl_images" | sort -u)
+
+if [[ -z "$all_images" ]]; then
+    echo "No images found for Helm release '$HELM_RELEASE' or running pods in namespace '$NAMESPACE'."
+    exit 1
+fi
+
+echo "Found images:"
+echo "$all_images"
+
+updated_images=""
+while IFS= read -r image; do
+    echo "Checking image $image for newer versions..."
+    read -r registry repo current_tag <<< "$(parse_image "$image")"
+
+    # Fetch latest tag
+    tag_list=$(az acr repository show-tags --name "${REGISTRY_NAME%%.*}" --repository "$repo" --query "[]" -o tsv 2>/dev/null)
+    latest_tag=$(echo "$tag_list" | sort -V | tail -n 1)
+
+    if [[ "$latest_tag" != "$current_tag" ]]; then
+        echo "Updating $repo from $current_tag to $latest_tag"
+        if [[ -n "$repo" && -n "$latest_tag" ]]; then
+            updated_images+="$repo $latest_tag"$'\n'
+        fi
+    fi
+done <<< "$all_images"
+
+echo "$updated_images" >> $WORKDIR/update_images
+
+if [[ -n "$updated_images" ]]; then
+    echo "Constructing Helm upgrade command..."
+    set_flags=$(construct_set_flags "$MAPPING_FILE" "$updated_images")
+    helm_upgrade_command="helm upgrade $HELM_RELEASE $HELM_REPO_NAME/$HELM_CHART_NAME -n $NAMESPACE --kube-context $CONTEXT --reuse-values $set_flags"
+    if [[ "$HELM_APPLY_UPGRADE" == "true" ]]; then
+        echo "Applying Helm upgrade..."
+        helm repo add $HELM_REPO_NAME $HELM_REPO_URL
+        $helm_upgrade_command
+    else
+        echo "Helm upgrade command (not applied):"
+        echo "$helm_upgrade_command"
+        echo "true: $helm_upgrade_command" >> $WORKDIR/helm_update_required
+    fi
+else
+    echo "No updates required. Helm release '$HELM_RELEASE' is up-to-date."
+fi

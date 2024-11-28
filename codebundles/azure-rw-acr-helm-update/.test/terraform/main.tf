@@ -80,7 +80,7 @@ resource "null_resource" "fetch_kubeconfig" {
 
   provisioner "local-exec" {
     command = <<EOT
-az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.cluster_aks.name} --overwrite-existing
+az aks get-credentials --resource-group ${azurerm_resource_group.rg.name} --name ${azurerm_kubernetes_cluster.cluster_aks.name} --overwrite-existing --admin
 EOT
   }
 

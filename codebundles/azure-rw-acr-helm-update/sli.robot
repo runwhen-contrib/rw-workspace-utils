@@ -8,7 +8,6 @@ Library             BuiltIn
 Library             RW.Core
 Library             RW.CLI
 Library             RW.platform
-Library             RW.Helm
 Library             OperatingSystem
 
 
@@ -17,28 +16,19 @@ Suite Setup         Suite Initialization
 Check for Available RunWhen Helm Images in ACR Registry`${REGISTRY_NAME}`
     [Documentation]    Count the number of running RunWhen images that have updates available in ACR (via Helm CLI). 
     [Tags]    acr    update    codecollection    utility    helm    runwhen
-    # ${codecollection_images}=    RW.CLI.Run Bash File
-    # ...    bash_file=helm_update.sh
-    # ...    env=${env}
-    # ...    timeout_seconds=300
-    # ...    include_in_history=false
-    # ...    show_in_rwl_cheatsheet=false
-    ${images}=    RW.Helm.Update Helm Release Images
-    ...    repo_url=https://runwhen-contrib.github.io/helm-charts
-    ...    chart_name=runwhen-local
-    ...    release_name=runwhen-local
-    ...    namespace=runwhen-local-beta
-    ...    registry_type=acr
-    ...    registry_details=runwhensandboxacr.azurecr.io, 2a0cf760-baef-4446-b75c-75c4f8a6267f
-    
+    ${rwl_image_updates}=    RW.CLI.Run Bash File
+    ...    bash_file=helm_update.sh
+    ...    env=${env}
+    ...    secret_file__kubeconfig=${kubeconfig}
+    ...    timeout_seconds=300
+    ...    include_in_history=false
+    ...    show_in_rwl_cheatsheet=false
+    ${image_update_count}=    RW.CLI.Run Cli
+    ...    cmd=[ -f "$WORKDIR/update_images" ] && cat "$WORKDIR/update_images" | grep -v '^$' | wc -l
+    ...    env=${env}
+    ...    include_in_history=false 
 
-    # ${image_update_count}=    RW.CLI.Run Cli
-    # ...    cmd=[ -f "${OUTPUT_DIR}/azure-rw-acr-sync/cc_images_to_update.json" ] && cat "${OUTPUT_DIR}/azure-rw-acr-sync/cc_images_to_update.json" | jq 'if . == null or . == [] then 0 else length end' | tr -d '\n' || echo -n 0
-    # ...    env=${env}
-    # ...    include_in_history=false
-    # RW.Core.Push Metric    ${total_images}
-
-    # Set Global Variable    ${outdated_codecollection_images}    ${image_update_count.stdout}
+    RW.Core.Push Metric    ${image_update_count.stdout}
 
 *** Keywords ***
 Suite Initialization
@@ -54,7 +44,36 @@ Suite Initialization
     ...    type=string
     ...    description=The kubeconfig used to fetch the Helm release details
     ...    pattern=\w*
-
+    ${REPOSITORY_ROOT_PATH}=    RW.Core.Import User Variable    REPOSITORY_ROOT_PATH
+    ...    type=string
+    ...    description=The name root path of the repository for image storage.   
+    ...    pattern=\w*
+    ...    example=runwhen
+    ...    default=runwhen
+    ${HELM_APPLY_UPGRADE}=    RW.Core.Import User Variable    HELM_APPLY_UPGRADE
+    ...    type=string
+    ...    description=Set to true in order to automatically apply the suggested Helm upgrade   
+    ...    pattern=\w*
+    ...    example=false
+    ...    default=false
+    ${NAMESPACE}=    RW.Core.Import User Variable    NAMESPACE
+    ...    type=string
+    ...    description=Which Namespace to evaluate for RunWhen Helm Updates  
+    ...    pattern=\w*
+    ...    example=runwhen-local
+    ...    default=runwhen-local
+    ${CONTEXT}=    RW.Core.Import User Variable    CONTEXT
+    ...    type=string
+    ...    description=The Kubernetes Context to use  
+    ...    pattern=\w*
+    ...    example=default
+    ...    default=default
+    ${HELM_RELEASE}=    RW.Core.Import User Variable    HELM_RELEASE
+    ...    type=string
+    ...    description=The Helm release name to update  
+    ...    pattern=\w*
+    ...    example=runwhen-local
+    ...    default=runwhen-local
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-sync", "TMPDIR":"/var/tmp/runwhen"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "HELM_RELEASE":"${HELM_RELEASE}","REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-helm-update", "TMPDIR":"/var/tmp/runwhen", "NAMESPACE":"${NAMESPACE}","CONTEXT":"${CONTEXT}", "HELM_APPLY_UPGRADE":"${HELM_APPLY_UPGRADE}", "REPOSITORY_ROOT_PATH":"${REPOSITORY_ROOT_PATH}"}

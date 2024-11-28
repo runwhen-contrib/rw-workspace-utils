@@ -463,7 +463,7 @@ opentelemetry-collector:
   image:
     repository: "runwhensandboxacr.azurecr.io/runwhen/opentelemetry-collector"
     pullPolicy: IfNotPresent
-    tag: "0.110.0"
+    tag: "0.109.0"
   imagePullSecrets: []
   command:
     name: "otelcol"
