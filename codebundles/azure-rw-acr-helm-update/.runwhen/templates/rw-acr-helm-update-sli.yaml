@@ -23,7 +23,7 @@ spec:
     {% else %}
     ref: main
     {% endif %}
-    pathToRobot: codebundles/azure-rw-acr-helm-update/runbook.robot
+    pathToRobot: codebundles/azure-rw-acr-helm-update/sli.robot
   intervalStrategy: intermezzo
   intervalSeconds: 600
   configProvided:
