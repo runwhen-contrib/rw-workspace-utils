@@ -15,7 +15,8 @@ export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
 export TF_VAR_tenant_id=$AZ_TENANT_ID
 export TF_VAR_sp_principal_id=$(az ad sp show --id $AZ_CLIENT_ID | jq -r .id)
 export TF_VAR_container_registry_scope=$(az ad sp show --id $AZ_CLIENT_ID | jq -r .id)
-
+export NAMESPACE=runwhen-local-beta
+export CONTEXT=cluster1-admin
 ```
 
 The infrastructure (e.g. task build-infra) will deploy an AKS cluster, ready for installation of the runwhen-local helm chart. 

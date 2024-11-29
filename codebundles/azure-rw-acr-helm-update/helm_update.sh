@@ -5,7 +5,7 @@ REGISTRY_NAME="${REGISTRY_NAME:-runwhensandboxacr.azurecr.io}"  # Full Azure Con
 NAMESPACE="${NAMESPACE:-runwhen-local-beta}"  # Kubernetes namespace
 HELM_RELEASE="${HELM_RELEASE:-runwhen-local}"  # Helm release name
 CONTEXT="${CONTEXT:-cluster1}"  # Kubernetes context to use
-MAPPING_FILE="../image_mappings.yaml"  # Generic mapping file
+MAPPING_FILE="image_mappings.yaml"  # Generic mapping file
 HELM_APPLY_UPGRADE="${HELM_APPLY_UPGRADE:-false}"  # Set to "true" to apply upgrades
 REGISTRY_REPOSITORY_PATH="${REGISTRY_REPOSITORY_PATH:-runwhen}"  # Default repository root path
 
@@ -17,7 +17,7 @@ WORKDIR="${WORKDIR:-./helm_work}"
 # Clean temp update file
 rm -rf $WORKDIR || true
 mkdir -p $WORKDIR
-
+cp ../$MAPPING_FILE . || true
 
 # Function to parse image into components
 parse_image() {

@@ -301,7 +301,7 @@ runner:
       pullSecret: ""
       pullPolicy: ""
       registry: ""
-      repository: "ruwhen"
+      repository: "runwhen"
     # volumes common for all the pods created by the runner
     volumes: {}
 
