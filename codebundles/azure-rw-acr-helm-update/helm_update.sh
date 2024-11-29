@@ -1,18 +1,18 @@
 #!/bin/bash
 
 # Variables
-REGISTRY_NAME="${REGISTRY_NAME:-runwhensandboxacr.azurecr.io}"  # Full Azure Container Registry URL
-NAMESPACE="${NAMESPACE:-runwhen-local-beta}"  # Kubernetes namespace
-HELM_RELEASE="${HELM_RELEASE:-runwhen-local}"  # Helm release name
-CONTEXT="${CONTEXT:-cluster1}"  # Kubernetes context to use
-MAPPING_FILE="image_mappings.yaml"  # Generic mapping file
-HELM_APPLY_UPGRADE="${HELM_APPLY_UPGRADE:-false}"  # Set to "true" to apply upgrades
-REGISTRY_REPOSITORY_PATH="${REGISTRY_REPOSITORY_PATH:-runwhen}"  # Default repository root path
+export REGISTRY_NAME="${REGISTRY_NAME:-myacr.azurecr.io}"  # Full Azure Container Registry URL
+export NAMESPACE="${NAMESPACE:-runwhen-local}"  # Kubernetes namespace
+export HELM_RELEASE="${HELM_RELEASE:-runwhen-local}"  # Helm release name
+export CONTEXT="${CONTEXT:-cluster1}"  # Kubernetes context to use
+export MAPPING_FILE="image_mappings.yaml"  # Generic mapping file
+export HELM_APPLY_UPGRADE="${HELM_APPLY_UPGRADE:-false}"  # Set to "true" to apply upgrades
+export REGISTRY_REPOSITORY_PATH="${REGISTRY_REPOSITORY_PATH:-runwhen}"  # Default repository root path
 
-HELM_REPO_URL="${HELM_REPO_URL:-https://runwhen-contrib.github.io/helm-charts}"
-HELM_REPO_NAME="${HELM_REPO_NAME:-runwhen-contrib}"
-HELM_CHART_NAME="${HELM_CHART_NAME:-runwhen-local}"
-WORKDIR="${WORKDIR:-./helm_work}" 
+export HELM_REPO_URL="${HELM_REPO_URL:-https://runwhen-contrib.github.io/helm-charts}"
+export HELM_REPO_NAME="${HELM_REPO_NAME:-runwhen-contrib}"
+export HELM_CHART_NAME="${HELM_CHART_NAME:-runwhen-local}"
+export WORKDIR="${WORKDIR:-./helm_work}" 
 
 # Clean temp update file
 rm -rf $WORKDIR || true
