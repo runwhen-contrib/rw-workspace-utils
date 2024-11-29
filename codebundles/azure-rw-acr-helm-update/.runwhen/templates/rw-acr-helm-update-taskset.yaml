@@ -28,7 +28,7 @@ spec:
     - name: HELM_APPLY_UPGRADE
       value: "true"
     - name: HELM_RELEASE
-      value: {{match_resource.resource.metadata.annotations.meta\.helm\.sh\/release-name}}
+      value: {{match_resource.resource.metadata.annotations.get('meta.helm.sh/release-name', None)}}
     - name: NAMESPACE
       value: {{match_resource.resource.metadata.namespace}}
     - name: CONTEXT

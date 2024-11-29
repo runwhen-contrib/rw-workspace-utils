@@ -15,8 +15,8 @@ resource "azurerm_user_assigned_identity" "cluster_identity" {
 }
 
 # Role Assignment for Service Principal
-resource "azurerm_role_assignment" "cluster_sp_owner" {
-  scope                = "/subscriptions/${var.subscription_id}"
+resource "azurerm_role_assignment" "cluster_admin" {
+  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_resource_group.rg.name}"
   role_definition_name = "Azure Kubernetes Service RBAC Cluster Admin"
   principal_id         = var.sp_principal_id
   principal_type       = "ServicePrincipal"
@@ -87,8 +87,8 @@ EOT
   # Ensure dependency on AKS creation and role assignment
   depends_on = [
     azurerm_kubernetes_cluster.cluster_aks,
-    azurerm_role_assignment.current_user_rbac_admin,
-    azurerm_role_assignment.cluster_sp_owner
+    azurerm_role_assignment.current_user_rbac_admin
+    # azurerm_role_assignment.cluster_admin
   ]
 }
 
