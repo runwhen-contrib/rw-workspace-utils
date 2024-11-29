@@ -30,4 +30,4 @@ spec:
         - type: slx
         - type: sli
         - type: runbook
-          templateName: azure-rw-acr-sync-taskset.yaml
+          templateName: rw-acr-helm-update-taskset.yaml
