@@ -53,6 +53,11 @@ Suite Initialization
     ...    type=string
     ...    description=The kubeconfig used to fetch the Helm release details
     ...    pattern=\w*
+    ${azure_credentials}=    RW.Core.Import Secret
+    ...    azure_credentials
+    ...    type=string
+    ...    description=The secret containing AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+    ...    pattern=\w*
     ${REGISTRY_REPOSITORY_PATH}=    RW.Core.Import User Variable    REGISTRY_REPOSITORY_PATH
     ...    type=string
     ...    description=The name root path of the repository for image storage.   
