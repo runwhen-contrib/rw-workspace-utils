@@ -4,6 +4,7 @@ tasks:
   default:
     desc: "Generate workspaceInfo and rebuild/test"
     cmds:
+      - task: check-unpushed-commits
       - task: generate-rwl-config
       - task: run-rwl-discovery
 
@@ -18,6 +19,45 @@ tasks:
     cmds:
       - task: build-terraform-infra
 
+
+  check-unpushed-commits:
+    desc: Check if outstanding commits or file updates need to be pushed before testing.
+    vars:
+      # Specify the base directory relative to your Taskfile location
+      BASE_DIR: "../"
+    cmds:
+      - |
+        echo "Checking for uncommitted changes in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        UNCOMMITTED_FILES=$(git diff --name-only HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNCOMMITTED_FILES" ]; then
+          echo "✗"
+          echo "Uncommitted changes found:"
+          echo "$UNCOMMITTED_FILES"
+          echo "Remember to commit & push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1    
+        else
+          echo "√"
+          echo "No uncommitted changes in specified directories."
+          echo "------------"        
+        fi
+      - |
+        echo "Checking for unpushed commits in $BASE_DIR and $BASE_DIR.runwhen, excluding '.test'..."
+        git fetch origin
+        UNPUSHED_FILES=$(git diff --name-only origin/$(git rev-parse --abbrev-ref HEAD) HEAD | grep -E "^${BASE_DIR}(\.runwhen|[^/]+)" | grep -v "/\.test/" || true)
+        if [ -n "$UNPUSHED_FILES" ]; then
+          echo "✗"
+          echo "Unpushed commits found:"
+          echo "$UNPUSHED_FILES"
+          echo "Remember to push changes before executing the `run-rwl-discovery` task."
+          echo "------------"
+          exit 1        
+        else
+          echo "√"
+          echo "No unpushed commits in specified directories."
+          echo "------------"        
+        fi
+    silent: true
 
   generate-rwl-config:
     desc: "Generate RunWhen Local configuration (workspaceInfo.yaml)"
