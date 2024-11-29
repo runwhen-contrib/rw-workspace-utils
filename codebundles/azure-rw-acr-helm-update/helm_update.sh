@@ -17,7 +17,12 @@ export WORKDIR="${WORKDIR:-./helm_work}"
 # Clean temp update file
 rm -rf $WORKDIR || true
 mkdir -p $WORKDIR
-cp ../$MAPPING_FILE . || true
+
+env
+echo "PWD"
+pwd 
+echo "list"
+ls -lha
 
 # Function to parse image into components
 parse_image() {
