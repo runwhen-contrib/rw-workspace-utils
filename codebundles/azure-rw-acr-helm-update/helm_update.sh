@@ -1,28 +1,22 @@
 #!/bin/bash
 
 # Variables
-export REGISTRY_NAME="${REGISTRY_NAME:-myacr.azurecr.io}"  # Full Azure Container Registry URL
-export NAMESPACE="${NAMESPACE:-runwhen-local}"  # Kubernetes namespace
-export HELM_RELEASE="${HELM_RELEASE:-runwhen-local}"  # Helm release name
-export CONTEXT="${CONTEXT:-cluster1}"  # Kubernetes context to use
-export MAPPING_FILE="image_mappings.yaml"  # Generic mapping file
-export HELM_APPLY_UPGRADE="${HELM_APPLY_UPGRADE:-false}"  # Set to "true" to apply upgrades
-export REGISTRY_REPOSITORY_PATH="${REGISTRY_REPOSITORY_PATH:-runwhen}"  # Default repository root path
+REGISTRY_NAME="${REGISTRY_NAME:-myacr.azurecr.io}"  # Full Azure Container Registry URL
+NAMESPACE="${NAMESPACE:-runwhen-local}"  # Kubernetes namespace
+HELM_RELEASE="${HELM_RELEASE:-runwhen-local}"  # Helm release name
+CONTEXT="${CONTEXT:-cluster1}"  # Kubernetes context to use
+MAPPING_FILE="${CURDIR}/image_mappings.yaml"  # Generic mapping file
+HELM_APPLY_UPGRADE="${HELM_APPLY_UPGRADE:-false}"  # Set to "true" to apply upgrades
+REGISTRY_REPOSITORY_PATH="${REGISTRY_REPOSITORY_PATH:-runwhen}"  # Default repository root path
 
-export HELM_REPO_URL="${HELM_REPO_URL:-https://runwhen-contrib.github.io/helm-charts}"
-export HELM_REPO_NAME="${HELM_REPO_NAME:-runwhen-contrib}"
-export HELM_CHART_NAME="${HELM_CHART_NAME:-runwhen-local}"
-export WORKDIR="${WORKDIR:-./helm_work}" 
+HELM_REPO_URL="${HELM_REPO_URL:-https://runwhen-contrib.github.io/helm-charts}"
+HELM_REPO_NAME="${HELM_REPO_NAME:-runwhen-contrib}"
+HELM_CHART_NAME="${HELM_CHART_NAME:-runwhen-local}"
+WORKDIR="${WORKDIR:-./helm_work}" 
 
 # Clean temp update file
 rm -rf $WORKDIR || true
 mkdir -p $WORKDIR
-
-env
-echo "PWD"
-pwd 
-echo "list"
-ls -lha
 
 # Function to parse image into components
 parse_image() {
@@ -47,7 +41,7 @@ construct_set_flags() {
     local mapping_file=$1
     local updated_images=$2
     local set_flags=""
-    local resolved_mapping_file=$(mktemp)
+    local resolved_mapping_file=$WORKDIR/resolved_mappings
 
     # Resolve placeholders in mapping file
     sed "s|\$REGISTRY_REPOSITORY_PATH|$REGISTRY_REPOSITORY_PATH|g" "$mapping_file" > "$resolved_mapping_file"
@@ -64,8 +58,6 @@ construct_set_flags() {
         set_path=$(yq eval ".images[] | select(.image == \"$normalized_repo\") | .set_path" "$resolved_mapping_file" 2>/dev/null)
         if [[ -n "$set_path" ]]; then
             set_flags+="--set $set_path=$tag "
-        else
-            echo "No mapping found for repository '$normalized_repo'. Skipping."
         fi
     done <<< "$updated_images"
 

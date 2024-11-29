@@ -16,8 +16,8 @@ Suite Setup         Suite Initialization
 Check for Available RunWhen Helm Images in ACR Registry`${REGISTRY_NAME}`
     [Documentation]    Count the number of running RunWhen images that have updates available in ACR (via Helm CLI). 
     [Tags]    acr    update    codecollection    utility    helm    runwhen
-    ${rwl_image_updates}=    RW.CLI.Run Cli
-    ...    cmd=./helm_update.sh
+    ${rwl_image_updates}=    RW.CLI.Run Bash File
+    ...    bash_file=helm_update.sh
     ...    env=${env}
     ...    secret_file__kubeconfig=${kubeconfig}
     ...    timeout_seconds=300
@@ -81,4 +81,4 @@ Suite Initialization
     ...    default=runwhen-local
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "HELM_RELEASE":"${HELM_RELEASE}","REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-helm-update", "NAMESPACE":"${NAMESPACE}","CONTEXT":"${CONTEXT}", "HELM_APPLY_UPGRADE":"${HELM_APPLY_UPGRADE}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
+    ...    {"CURDIR":"${CURDIR}", "KUBECONFIG":"./${kubeconfig.key}", "HELM_RELEASE":"${HELM_RELEASE}","REGISTRY_NAME":"${REGISTRY_NAME}", "WORKDIR":"${OUTPUT DIR}/azure-rw-acr-helm-update", "NAMESPACE":"${NAMESPACE}","CONTEXT":"${CONTEXT}", "HELM_APPLY_UPGRADE":"${HELM_APPLY_UPGRADE}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}"}
