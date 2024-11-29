@@ -19,3 +19,4 @@ variable "tags" {
 variable "subscription_id" { type = string }
 variable "tenant_id" { type = string }
 variable "sp_principal_id" { type = string }
+variable "container_registry_scope" { type = string }

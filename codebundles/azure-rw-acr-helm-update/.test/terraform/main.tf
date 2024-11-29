@@ -69,6 +69,13 @@ resource "azurerm_kubernetes_cluster" "cluster_aks" {
   }
 
 }
+# Attach cluster to registry 
+resource "azurerm_role_assignment" "cluster_aks" {
+  principal_id                     = azurerm_kubernetes_cluster.cluster_aks.kubelet_identity[0].object_id
+  role_definition_name             = "AcrPull"
+  scope                            = var.container_registry_scope
+  skip_service_principal_aad_check = true
+}
 
 # Separate Resource for Kubeconfig Retrieval
 resource "null_resource" "fetch_kubeconfig" {
