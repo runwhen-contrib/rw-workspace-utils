@@ -275,7 +275,7 @@ runner:
     tag: "20241125152412"
   controlAddr: "https://runner.beta.runwhen.com"
   metrics:
-    url: "https://runner-cortex-tenant.test.runwhen.com/push"
+    url: "https://runner-cortex-tenant.beta.runwhen.com/push"
 
   # securityContext (container) is used to set the security context for the runner container
   securityContext: {}

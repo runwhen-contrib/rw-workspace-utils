@@ -70,19 +70,16 @@ construct_set_flags() {
 # Main script logic
 echo "Extracting images for Helm release '$HELM_RELEASE' in namespace '$NAMESPACE' on context '$CONTEXT'..."
 
+# Extract images specifically from the Helm release manifest
 helm_images=$(helm get manifest "$HELM_RELEASE" -n "$NAMESPACE" --kube-context "$CONTEXT" | grep -oP '(?<=image: ).*' | sed 's/"//g' | sort -u)
-kubectl_images=$(kubectl get pods -n "$NAMESPACE" --context "$CONTEXT" -o json | jq -r '.items[].spec.containers[].image' | sort -u)
 
-# Combine and deduplicate images
-all_images=$(echo -e "$helm_images\n$kubectl_images" | sort -u)
-
-if [[ -z "$all_images" ]]; then
-    echo "No images found for Helm release '$HELM_RELEASE' or running pods in namespace '$NAMESPACE'."
+if [[ -z "$helm_images" ]]; then
+    echo "No images found for Helm release '$HELM_RELEASE'."
     exit 1
 fi
 
-echo "Found images:"
-echo "$all_images"
+echo "Found images related to Helm release '$HELM_RELEASE':"
+echo "$helm_images"
 
 updated_images=""
 while IFS= read -r image; do
@@ -99,7 +96,7 @@ while IFS= read -r image; do
             updated_images+="$repo $latest_tag"$'\n'
         fi
     fi
-done <<< "$all_images"
+done <<< "$helm_images"
 
 echo "$updated_images" >> $WORKDIR/update_images
 
