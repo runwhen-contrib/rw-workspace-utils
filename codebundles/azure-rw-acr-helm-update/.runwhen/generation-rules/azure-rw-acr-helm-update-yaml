@@ -23,7 +23,7 @@ spec:
           mode: substring
     slxs:
     - baseName: rw-acr-helm-update
-      levelOfDetail: detailed
+      levelOfDetail: basic
       qualifiers: ["resource"]
       baseTemplateName: rw-acr-helm-update
       outputItems:
