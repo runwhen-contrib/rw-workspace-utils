@@ -31,7 +31,6 @@ echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 az acr login -n "$REGISTRY_NAME"
 
-# Function to parse image into components
 parse_image() {
     local image=$1
     local registry repo tag
@@ -40,13 +39,17 @@ parse_image() {
     repo=$(echo "$image" | cut -d '/' -f 2- | cut -d ':' -f 1)
     tag=$(echo "$image" | rev | cut -d ':' -f 1 | rev)
 
-    # Handle scientific notation
+    # Normalize scientific notation to a plain integer if necessary
     if [[ "$tag" =~ [0-9]+[eE][+-]?[0-9]+ ]]; then
         tag=$(printf "%.0f" "$tag")
     fi
 
+    # Explicitly quote the tag to treat it as a string
+    tag="'$(printf "%s" "$tag")'"
+
     echo "$registry" "$repo" "$tag"
 }
+
 
 # Resolve ${REGISTRY_REPOSITORY_PATH}
 resolve_REGISTRY_REPOSITORY_PATH() {
