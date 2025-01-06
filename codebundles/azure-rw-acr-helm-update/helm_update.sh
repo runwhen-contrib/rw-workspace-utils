@@ -35,18 +35,17 @@ parse_image() {
     local image=$1
     local registry repo tag
 
+    # Extract registry, repo, and tag
     registry=$(echo "$image" | cut -d '/' -f 1)
     repo=$(echo "$image" | cut -d '/' -f 2- | cut -d ':' -f 1)
     tag=$(echo "$image" | rev | cut -d ':' -f 1 | rev)
 
     # Normalize scientific notation to a plain integer if necessary
     if [[ "$tag" =~ [0-9]+[eE][+-]?[0-9]+ ]]; then
-        tag=$(printf "%.0f" "$tag")
+        tag=$(printf "%.0f" "$tag")  # Convert scientific notation to plain integer
     fi
 
-    # Explicitly quote the tag to treat it as a string
-    tag="'$(printf "%s" "$tag")'"
-
+    # Return components without quotes
     echo "$registry" "$repo" "$tag"
 }
 
