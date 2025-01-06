@@ -45,13 +45,7 @@ parse_image() {
         tag=$(printf "%.0f" "$tag")  # Convert scientific notation to plain integer
     fi
 
-<<<<<<< HEAD
     # Return components without quotes
-=======
-    # Explicitly quote the tag to treat it as a string
-    tag="'$(printf "%s" "$tag")'"
-
->>>>>>> effbc44 (try for aomething that is more string safe)
     echo "$registry" "$repo" "$tag"
 }
 
