@@ -272,7 +272,7 @@ runner:
   image:
     registry: ""
     repository: "runwhen/runner"
-    tag: "20241125152412"
+    tag: "2.0241218150942e+13"
   controlAddr: "https://runner.beta.runwhen.com"
   metrics:
     url: "https://runner-cortex-tenant.beta.runwhen.com/push"
