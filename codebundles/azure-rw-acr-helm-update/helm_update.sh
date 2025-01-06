@@ -69,9 +69,9 @@ construct_set_flags() {
         normalized_repo=$(resolve_REGISTRY_REPOSITORY_PATH "$repo")
         set_path=$(yq eval ".images[] | select(.image == \"$normalized_repo\") | .set_path" "$resolved_mapping_file" 2>/dev/null | sed 's/^"//;s/"$//')
 
-        # Use single quotes around the tag
+        # Pass tag as-is (no quotes)
         if [[ -n "$set_path" ]]; then
-            set_flags+="--set $set_path='$tag' "
+            set_flags+="--set $set_path=$tag "
         fi
     done <<< "$updated_images"
 
@@ -117,13 +117,14 @@ echo "$updated_images" >> "$WORKDIR/update_images"
 if [[ -n "$updated_images" ]]; then
     echo "Constructing Helm upgrade command..."
     set_flags=$(construct_set_flags "$MAPPING_FILE" "$updated_images")
-    
+
     # Construct Helm upgrade command
     helm_upgrade_command="helm upgrade $HELM_RELEASE $HELM_REPO_NAME/$HELM_CHART_NAME -n $NAMESPACE --kube-context $CONTEXT --reuse-values $set_flags"
 
     if [[ "$HELM_APPLY_UPGRADE" == "true" ]]; then
         echo "Applying Helm upgrade..."
         helm repo add "$HELM_REPO_NAME" "$HELM_REPO_URL"
+        echo "Running command: $helm_upgrade_command"
         $helm_upgrade_command || { echo "Helm upgrade failed. Inspect rendered YAML at $rendered_yaml."; exit 1; }
     else
         echo "Helm upgrade command (not applied):"
