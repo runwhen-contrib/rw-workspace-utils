@@ -38,7 +38,12 @@ parse_image() {
 
     registry=$(echo "$image" | cut -d '/' -f 1)
     repo=$(echo "$image" | cut -d '/' -f 2- | cut -d ':' -f 1)
-    tag=$(echo "$image" | rev | cut -d ':' -f 1 | rev)  # Ensures the tag is correctly extracted as a string
+    tag=$(echo "$image" | rev | cut -d ':' -f 1 | rev)
+
+    # Handle scientific notation
+    if [[ "$tag" =~ [0-9]+[eE][+-]?[0-9]+ ]]; then
+        tag=$(printf "%.0f" "$tag")
+    fi
 
     echo "$registry" "$repo" "$tag"
 }
