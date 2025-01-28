@@ -151,6 +151,41 @@ def run_tasks_for_slx(
         platform_logger.exception(e)
         return []
 
+def import_runsession_details():
+    """Fetch full RunSession details in JSON format.
+    If RW_USER_TOKEN is set, use it instead of the built-in token,
+    which can be useful for testing.
+    """
+    try:
+        rw_runsession = import_platform_variable("RW_SESSION_ID")
+        rw_workspace = import_platform_variable("RW_WORKSPACE")
+        rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError:
+        BuiltIn().log(f"Failure importing required variables", level='WARN')
+        return None
+
+    url = f"{rw_workspace_api_url}/{rw_workspace}/runsessions/{rw_runsession}"
+    BuiltIn().log(f"Importing runsession variable with URL: {url}, runsession {rw_runsession}", level='INFO')
+    
+    # Use RW_USER_TOKEN if it is set, otherwise use the authenticated session
+    user_token = os.getenv("RW_USER_TOKEN")
+    if user_token:
+        headers = {"Authorization": f"Bearer {user_token}"}
+        session = requests.Session()
+        session.headers.update(headers)
+    else:
+        session = platform.get_authenticated_session()
+
+    try:
+        rsp = session.get(url, timeout=10, verify=platform.REQUEST_VERIFY)
+        rsp.raise_for_status()
+        return json.dumps(rsp.json())
+    except (requests.ConnectTimeout, requests.ConnectionError, json.JSONDecodeError) as e:
+        warning_log(f"Exception while trying to get runsession details: {e}", str(e), str(type(e)))
+        platform_logger.exception(e)
+        return json.dumps(None)
+
+
 
 ## This is an edit of the core platform keyword that was having trouble
 ## This has been been rewritten to avoid debugging core keywords that follow
