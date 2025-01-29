@@ -1,7 +1,7 @@
 *** Settings ***
 Metadata          Author    stewartshea
 Documentation     This CodeBundle create a new GitHub Issue with the RunSession details. 
-Metadata          Supports     GitHub
+Metadata          Supports     GitHub   RunWhen
 Metadata          Display Name     GitHub Create Issue
 Suite Setup       Suite Initialization
 Library           BuiltIn
@@ -33,19 +33,30 @@ Suite Initialization
 *** Tasks ***
 Create GitHub Issue in Repository `${GITHUB_REPOSITORY}` from RunSession
     [Documentation]    Create a GitHub Issue with the summarized details of the RunSession. Intended to be used as a final task in a workflow. 
-    [Tags]    github    issue    final    ticket
+    [Tags]    github    issue    final    ticket    runsession
     ${session_list}=    Evaluate    json.loads(r'''${SESSION}''')    json
     ${open_issue_count}=    RW.RunSession.Count Open Issues    ${SESSION}
-    ${title}=        Set Variable    "[RunWhen] ${open_issue_count} open issues from ${session_list["source"]}"
-    Add Pre To Report    Title: ${title}
     ${open_issues}=    RW.RunSession.Get Open Issues    ${SESSION}
     ${issue_table}=    RW.RunSession.Generate Open Issue Markdown Table    ${open_issues}
-    Add Pre To Report    ${issue_table}
-    ${github_issue}=    RW.GitHub.Create GitHub Issue     
-    ...    title=${title}
-    ...    body=${issue_table}
-    ...    github_token=${GITHUB_TOKEN}
-    ...    repo=${GITHUB_REPOSITORY}
-    Add Pre To Report    ${github_issue}
+    ${users}=    RW.RunSession.Summarize RunSession Users      ${SESSION}
+    ${runsession_url}=    RW.RunSession.Get RunSession URL
+    ${key_resource}=    RW.RunSession.Get Most Referenced Resource    ${SESSION}
+    ${title}=    Set Variable    [RunWhen] ${open_issue_count} open issue(s) from ${session_list["source"]} related to `${key_resource}`
+    
+    Add Pre To Report    Title: ${title}
+    Add Pre To Report    Total Open Issues:${open_issue_count}
+    Add Pre To Report    Users:\n${users}
+    Add Pre To Report    Open Issues:\n${issue_table}
+    
+    IF    $open_issue_count > 0
+        ${github_issue}=    RW.GitHub.Create GitHub Issue     
+        ...    title=${title}
+        ...    body=### Details\n---\n[🔗 View RunSession](${runsession_url})\n\n${users}\n\n### Open Issues\n${issue_table}
+        ...    github_token=${GITHUB_TOKEN}
+        ...    repo=${GITHUB_REPOSITORY}
+        
+        # ${github_rsp}=    Evaluate    json.loads(r'''${github_issue}''')    json
+        Add To Report    [GitHub Issue Created](${github_issue["html_url"]})
+    END
 
 
