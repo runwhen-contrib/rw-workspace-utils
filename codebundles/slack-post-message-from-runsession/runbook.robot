@@ -18,12 +18,16 @@ Library           RW.Slack
 
 *** Keywords ***
 Suite Initialization
-    # Import or retrieve your Slack webhook URL.
     ${SLACK_WEBHOOK}=    RW.Core.Import Secret    SLACK_WEBHOOK
     ...    type=string
     ...    description=Slack webhook URL used to post the notification
     ...    pattern=\w*
-
+    ${SLACK_CHANNEL}=    RW.Core.Import User Variable    SLACK_CHANNEL
+    ...    type=string
+    ...    description=The Slack channel to post the message into. Note: The Webhook URL determines the channel, but can be overridden with Legacy Webhooks only. 
+    ...    pattern=\w*
+    ...    example=#general
+    Set Suite Variable    ${SLACK_CHANNEL}    ${SLACK_CHANNEL}
     # Get the current RunSession details from the workspace
     ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
     # Check if there is a "related" RunSession to fetch instead
@@ -37,7 +41,7 @@ Suite Initialization
     END
 
 *** Tasks ***
-Send Slack Notification from RunSession
+Send Slack Notification to Channel `${SLACK_CHANNEL}` from RunSession
     [Documentation]    Sends a Slack message containing the summarized details of the RunSession.
     ...                Intended to be used as a final task in a workflow.
     [Tags]             slack    final    notification    runsession
@@ -64,7 +68,10 @@ Send Slack Notification from RunSession
 
     IF    $open_issue_count > 0
         RW.Slack.Send Slack Message    
-        ...    webhook_url=${SLACK_WEBHOOK}   blocks=${blocks}    attachments=${attachments}
+        ...    webhook_url=${SLACK_WEBHOOK}   
+        ...    blocks=${blocks}    
+        ...    attachments=${attachments}    
+        ...    channel=${SLACK_CHANNEL}
     
         # TODO Add http rsp code and open issue if rsp fails
         Add To Report      Slack Message Sent with Open Issues

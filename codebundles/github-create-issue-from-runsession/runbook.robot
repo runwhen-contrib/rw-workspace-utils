@@ -67,6 +67,4 @@ Create GitHub Issue in Repository `${GITHUB_REPOSITORY}` from RunSession
     ELSE
         Add To Report      No Open Issues Found
     END
-    END
-
 

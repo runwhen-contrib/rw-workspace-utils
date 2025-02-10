@@ -12,25 +12,28 @@ class Slack:
         webhook_url: platform.Secret,
         blocks=None,
         attachments=None,
-        text=None
+        text=None,
+        channel=None
     ):
         """
         Sends a Slack message to the specified webhook URL.
 
-        You can pass in:
-          - `blocks`: (list) top-level Block Kit blocks
-          - `attachments`: (list) color-coded attachments (legacy format)
-          - `text`: (str) optional fallback if no blocks/attachments are used
+        :param webhook_url: (platform.Secret) Slack Incoming Webhook URL
+        :param blocks: (Optional) A Python list of top-level Block Kit blocks.
+        :param attachments: (Optional) A list of Slack attachments (color-coded sidebars).
+        :param text: (Optional) Plaintext fallback if blocks/attachments not used.
+        :param channel: (Optional) A string to override the default channel, e.g. "#some-other-channel".
 
-        :param webhook_url: (platform.Secret) Slack Incoming Webhook URL.
-        :param blocks: (Optional) A Python list describing Block Kit blocks at the top level.
-        :param attachments: (Optional) A list of Slack attachments, each with optional color.
-        :param text: (Optional) Plaintext fallback.
-        :raises AssertionError: If Slack returns non-200 or request fails.
+        Note: Overriding the channel may be ignored if your Slack webhook is 
+        configured for a specific channel and does not allow overrides.
         """
         BuiltIn().log(f"Sending Slack message to {webhook_url.value}", level="INFO")
 
         payload = {}
+        # If you want to override the channel, set it here
+        if channel:
+            payload["channel"] = channel
+
         if blocks:
             payload["blocks"] = blocks
         if attachments:
@@ -47,7 +50,6 @@ class Slack:
             return response.text
         except requests.RequestException as e:
             raise AssertionError(f"Exception sending Slack message: {e}")
-
 
     @keyword("Create RunSession Summary Payload")
     def create_runsession_summary_payload(
