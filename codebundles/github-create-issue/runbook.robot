@@ -1,8 +1,9 @@
 *** Settings ***
 Metadata          Author    stewartshea
-Documentation     This CodeBundle create a new GitHub Issue with the RunSession details. 
+Documentation     This CodeBundle create a new GitHub Issue with the summary of open issues from the RunSession. 
+...    This is intended to be used at the end of a RunSession if open issues exist and need further action.
 Metadata          Supports     GitHub   RunWhen
-Metadata          Display Name     GitHub Create Issue
+Metadata          Display Name     GitHub - Create Issue From RunSession
 Suite Setup       Suite Initialization
 Library           BuiltIn
 Library           RW.Core
