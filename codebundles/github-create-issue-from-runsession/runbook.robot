@@ -43,8 +43,10 @@ Create GitHub Issue in Repository `${GITHUB_REPOSITORY}` from RunSession
     ${open_issue_count}=    RW.RunSession.Count Open Issues    ${SESSION}
     ${open_issues}=    RW.RunSession.Get Open Issues    ${SESSION}
     ${issue_table}=    RW.RunSession.Generate Open Issue Markdown Table    ${open_issues}
-    ${users}=    RW.RunSession.Summarize RunSession Users      ${SESSION}
-    ${runsession_url}=    RW.RunSession.Get RunSession URL
+    ${users}=    RW.RunSession.Summarize RunSession Users      
+    ...    data=${SESSION}
+    ...    format=markdown
+    ${runsession_url}=    RW.RunSession.Get RunSession URL    ${session_list["id"]}
     ${key_resource}=    RW.RunSession.Get Most Referenced Resource    ${SESSION}
     ${title}=    Set Variable    [RunWhen] ${open_issue_count} open issue(s) from ${session_list["source"]} related to `${key_resource}`
     

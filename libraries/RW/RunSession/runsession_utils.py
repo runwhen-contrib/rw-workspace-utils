@@ -3,10 +3,11 @@ from datetime import datetime
 from robot.libraries.BuiltIn import BuiltIn
 from collections import Counter
 
-def get_runsession_url():
+def get_runsession_url(rw_runsession=None):
     """Return a direct link to the RunSession."""
     try:
-        rw_runsession = os.getenv("RW_SESSION_ID")
+        if not rw_runsession:
+            rw_runsession = import_platform_variable("RW_SESSION_ID")
         rw_workspace = os.getenv("RW_WORKSPACE")
         rw_workspace_app_url = os.getenv("RW_FRONTEND_URL")
     except ImportError:
@@ -65,7 +66,7 @@ def get_open_issues(data: str):
                 open_issue_list.append(issue)
     return open_issue_list
 
-def summarize_runsession_users(data: str):
+def summarize_runsession_users(data: str, format: str = "text"):
     runsession = json.loads(data)
     participants = set()
     engineering_assistants = set()
@@ -83,11 +84,13 @@ def summarize_runsession_users(data: str):
         
         participants.add(requester)
         engineering_assistants.add(persona_full_name)
-    
-    markdown_output = "#### Participants:\n" + "\n".join([f"- {participant}" for participant in sorted(participants)])
-    markdown_output += "\n" + "\n".join([f"- {assistant} (Engineering Assistant)" for assistant in sorted(engineering_assistants)])
-    
-    return markdown_output
+    if format == "markdown": 
+        markdown_output = "#### Participants:\n" + "\n".join([f"- {participant}" for participant in sorted(participants)])
+        markdown_output += "\n" + "\n".join([f"- {assistant} (Engineering Assistant)" for assistant in sorted(engineering_assistants)])
+        return markdown_output
+    else: 
+        text_output="\n".join([f"{assistant} (Engineering Assistant)" for assistant in sorted(engineering_assistants)])
+        return text_output
 
 def extract_issue_keywords(data: str):
     runsession = json.loads(data) 
