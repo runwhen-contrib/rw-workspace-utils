@@ -66,5 +66,8 @@ Send Slack Notification from RunSession
         RW.Slack.Send Slack Message    
         ...    webhook_url=${SLACK_WEBHOOK}   blocks=${blocks}    attachments=${attachments}
     
-        Add To Report      [Slack Message Sent]
+        # TODO Add http rsp code and open issue if rsp fails
+        Add To Report      Slack Message Sent with Open Issues
+    ELSE
+        Add To Report      No Open Issues Found
     END

@@ -62,8 +62,11 @@ Create GitHub Issue in Repository `${GITHUB_REPOSITORY}` from RunSession
         ...    github_token=${GITHUB_TOKEN}
         ...    repo=${GITHUB_REPOSITORY}
         
-        # ${github_rsp}=    Evaluate    json.loads(r'''${github_issue}''')    json
+        # TODO Add http rsp code and open issue if rsp fails
         Add To Report    [GitHub Issue Created](${github_issue["html_url"]})
+    ELSE
+        Add To Report      No Open Issues Found
+    END
     END
 
 
