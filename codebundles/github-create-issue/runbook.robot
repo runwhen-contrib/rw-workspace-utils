@@ -26,9 +26,13 @@ Suite Initialization
     ...    description=The secret containing the GitHub PAT. 
     ...    pattern=\w*
 
-    ${SESSION}=    RW.Workspace.Import Runsession Details
-    Set Suite Variable    ${SESSION}    ${SESSION}
-
+    ${CURRENT_SESSION}=    RW.Workspace.Import Runsession Details
+    ${RELATED_RUNSESSION}=     RW.Workspace.Import Related RunSession Details    ${CURRENT_SESSION}
+    IF    $RELATED_RUNSESSION != None
+        Set Suite Variable    ${SESSION}   ${RELATED_RUNSESSION}
+    ELSE
+        Set Suite Variable    ${SESSION}   ${CURRENT_SESSION}
+    END 
 
 *** Tasks ***
 Create GitHub Issue in Repository `${GITHUB_REPOSITORY}` from RunSession
