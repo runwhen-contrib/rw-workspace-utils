@@ -111,31 +111,71 @@ def get_open_issues(data: str):
                 open_issue_list.append(issue)
     return open_issue_list
 
-def summarize_runsession_users(data: str, format: str = "text"):
-    runsession = json.loads(data)
+def summarize_runsession_users(data: str, output_format: str = "text") -> str:
+    """
+    Parse a JSON string representing a RunWhen 'runsession' object
+    (with 'runRequests' entries), gather the unique participants and
+    the engineering assistants involved, and return a summary in either
+    plain text or Markdown format.
+
+    :param data: JSON string with top-level 'runRequests' list, each item
+                 possibly containing 'requester' and 'persona->spec->fullName'.
+    :param output_format: "text" or "markdown" (default: "text").
+    :return: A string summarizing the participants and engineering assistants.
+    """
+    try:
+        runsession = json.loads(data)
+    except json.JSONDecodeError:
+        # If the payload is not valid JSON, handle or raise
+        return "Error: Could not decode JSON from input."
+
+    # Prepare sets to avoid duplicates
     participants = set()
     engineering_assistants = set()
-    
+
+    # Gather data from each runRequest if present
     for request in runsession.get("runRequests", []):
-        persona = request.get("persona", {})
-        persona_full_name = persona.get("spec", {}).get("fullName", "Unknown")
-        requester = request.get("requester", "Unknown")
-        
-        if requester is None:
+        # Extract persona full name
+        persona = request.get("persona") or {}
+        spec = persona.get("spec") or {}
+        persona_full_name = spec.get("fullName", "Unknown")
+
+        # Extract requester
+        requester = request.get("requester")
+        if not requester:
             requester = "Unknown"
-        
+
+        # Normalize system requesters
         if "@workspaces.runwhen.com" in requester:
             requester = "RunWhen System"
-        
+
+        # Add to sets
         participants.add(requester)
         engineering_assistants.add(persona_full_name)
-    if format == "markdown": 
-        markdown_output = "#### Participants:\n" + "\n".join([f"- {participant}" for participant in sorted(participants)])
-        markdown_output += "\n" + "\n".join([f"- {assistant} (Engineering Assistant)" for assistant in sorted(engineering_assistants)])
-        return markdown_output
-    else: 
-        text_output="\n".join([f"{assistant} (Engineering Assistant)" for assistant in sorted(engineering_assistants)])
-        return text_output
+
+    # Format output
+    if output_format.lower() == "markdown":
+        # Construct a Markdown list
+        lines = ["#### Participants:"]
+        # Participants
+        for participant in sorted(participants):
+            lines.append(f"- {participant}")
+        # Engineering assistants
+        lines.append("\n#### Engineering Assistants:")
+        for assistant in sorted(engineering_assistants):
+            lines.append(f"- {assistant}")
+        return "\n".join(lines)
+    else:
+        # Plain text
+        text_lines = []
+        text_lines.append("Participants:")
+        for participant in sorted(participants):
+            text_lines.append(f"  - {participant}")
+        text_lines.append("")
+        text_lines.append("Engineering Assistants:")
+        for assistant in sorted(engineering_assistants):
+            text_lines.append(f"  - {assistant}")
+        return "\n".join(text_lines)
 
 def extract_issue_keywords(data: str):
     runsession = json.loads(data) 
