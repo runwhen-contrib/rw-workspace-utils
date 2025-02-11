@@ -17,6 +17,51 @@ def get_runsession_url(rw_runsession=None):
     runsession_url = f"{rw_workspace_app_url}/map/{rw_workspace}?selectedRunSessions={rw_runsession}"
     return runsession_url
 
+def get_runsession_source(payload: dict) -> str:
+    """
+    Given a RunWhen payload dictionary, return the "source" string based on:
+      1) If top-level "source" key exists, return that
+      2) Otherwise, look at the first (earliest) runRequest by 'created' time, and
+         check in order:
+             fromSearchQuery, fromIssue, fromSliAlert, fromAlert
+         Return the name of whichever key is non-null. 
+      3) If nothing is found, return "Unknown".
+    """
+
+    # 1) Check for a top-level 'source' key
+    if "source" in payload:
+        return payload["source"]
+
+    # 2) Otherwise, examine runRequests
+    run_requests = payload.get("runRequests", [])
+    if not run_requests:
+        return "Unknown"
+
+    # Sort runRequests by created time to find the earliest
+    def _parse_iso_datetime(dt: str) -> datetime:
+        # '2025-02-11T08:49:06.773513Z' -> parse with replacement of 'Z' to '+00:00'
+        return datetime.fromisoformat(dt.replace("Z", "+00:00"))
+
+    sorted_requests = sorted(run_requests, key=lambda rr: _parse_iso_datetime(rr["created"]))
+    earliest_rr = sorted_requests[0]
+
+    # 3) Check the relevant fields in the earliest runRequest
+    source_keys = ["fromSearchQuery", "fromIssue", "fromSliAlert", "fromAlert"]
+    for key in source_keys:
+        val = earliest_rr.get(key)
+        if val:
+            # "fromSearchQuery" -> "searchQuery"
+            # "fromIssue"       -> "issue"
+            # "fromSliAlert"    -> "sliAlert"
+            # "fromAlert"       -> "alert"
+            stripped = key[4:]  # removes "from", leaving e.g. "SearchQuery"
+            # optionally lowercase the first character:
+            stripped = stripped[0].lower() + stripped[1:]
+            return stripped
+    # 4) If no source found
+    return "Unknown"
+
+
 def count_open_issues(data: str):
     """Return a count of issues that have not been closed."""
     open_issues = 0 
