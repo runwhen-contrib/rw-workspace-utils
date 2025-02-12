@@ -77,5 +77,6 @@ Send Slack Notification to Channel `${SLACK_CHANNEL}` from RunSession
         # TODO Add http rsp code and open issue if rsp fails
         Add To Report      Slack Message Sent with Open Issues
     ELSE
-        Add To Report      No Open Issues Found
+        Add To Report      No Open Issues Found in [RunSession ${session_list["id"]}](${runsession_url})
+
     END
