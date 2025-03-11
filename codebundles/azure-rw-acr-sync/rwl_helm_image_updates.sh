@@ -13,9 +13,9 @@ USE_DATE_TAG=${USE_DATE_TAG:-false} # Default is to not use date-based tags
 export DATE_TAG=${DATE_TAG:-$(date +%Y%m%d%H%M%S)} # Default date tag if enabled
 # Ensure Helm cache and repositories are correctly set
 
-export HELM_CACHE_HOME="helm"
-export HELM_CONFIG_HOME="helm/config"
-export HELM_DATA_HOME="helm/data"
+export HELM_CACHE_HOME="./helm"
+export HELM_CONFIG_HOME="./helm/config"
+export HELM_DATA_HOME="./helm/data"
 
 
 # Registry-specific variables
@@ -236,7 +236,7 @@ function pull_and_render_chart() {
     fi
 
     echo "Pulling Helm chart: $chart_name (version: $chart_version) from $repo_name..."
-    helm pull "$repo_name/$chart_name" --version "$chart_version" --untar --untardir "$WORKDIR"
+    helm pull "$repo_name/$chart_name" --version "$chart_version" --untar --untardir "."
 
     echo "Resolving dependencies for $chart_dir..."
     add_dependencies_repos "$chart_dir"
@@ -251,7 +251,7 @@ function pull_and_render_chart() {
     env > "debug_env.txt"
     echo "Current PATH: $PATH" >> "debug_env.log"
     helm repo list > "debug_helm.txt"
-    ls -l "$WORKDIR" > "debug_ls.txt"
+    ls -l "." > "debug_ls.txt"
 
     pushd "$chart_dir" > /dev/null
     helm dependency build --debug # || { echo "Failed to build dependencies for $chart_name. Exiting."; exit 1; }
