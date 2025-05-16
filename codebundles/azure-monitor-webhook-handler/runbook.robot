@@ -1,7 +1,7 @@
 *** Settings ***
 Metadata          Author    stewartshea
 Documentation     This CodeBundle inspects the azure monitor alert group webhook payload data (stored in the RunWhen Platform) and starts a RunSession from the available data. 
-Metadata          Supports     Azure   AzureMonitor
+Metadata          Supports     Azure   AzureMonitor   Webhook
 Metadata          Display Name     Azure Monitor Webhook Handler
 Suite Setup       Suite Initialization
 Library           BuiltIn
