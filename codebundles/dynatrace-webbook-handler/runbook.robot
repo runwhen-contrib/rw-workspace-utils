@@ -1,6 +1,7 @@
 *** Settings ***
 Metadata          Author    stewartshea
 Documentation     This CodeBundle inspects the dynatrace webhook payload data (stored in the RunWhen Platform) and starts a RunSession from the available data. 
+Metadata          Supports     Dynatrace
 Metadata          Display Name     Dynatrace Webhook Handler
 Suite Setup       Suite Initialization
 Library           BuiltIn
