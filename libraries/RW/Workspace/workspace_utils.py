@@ -35,36 +35,25 @@ def get_slxs_with_tag(
     Returns:
         list: List of SLXs that match the given tags
     """
+    # ------------------------------------------------------------------ #
+    # 1)  Gather workspace-scoped variables
+    # ------------------------------------------------------------------ #
     try:
-        runrequest_id = import_platform_variable("RW_RUNREQUEST_ID")
-        rw_runsession = import_platform_variable("RW_SESSION_ID")
-        rw_workspace = import_platform_variable("RW_WORKSPACE")
+        rw_workspace        = import_platform_variable("RW_WORKSPACE")
         rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
     except ImportError:
-        return None
+        return []
 
-    s = platform.get_authenticated_session()
-    url = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
-    matching_slxs = []
+    # ------------------------------------------------------------------ #
+    # 2)  Fetch all SLXs for the workspace
+    # ------------------------------------------------------------------ #
+    session = platform.get_authenticated_session()
+    url     = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
 
     try:
-        response = s.get(url, timeout=10)
-        response.raise_for_status()  # Ensure we raise an exception for bad responses
-        all_slxs = response.json()  # Parse the JSON content
-        results = all_slxs.get("results", [])
-
-        for result in results:
-            tags = result.get("spec", {}).get("tags", [])
-            for tag in tags:
-                if any(
-                    tag_item["name"] == tag["name"]
-                    and tag_item["value"] == tag["value"]
-                    for tag_item in tag_list
-                ):
-                    matching_slxs.append(result)
-                    break
-
-        return matching_slxs
+        resp = session.get(url, timeout=10)
+        resp.raise_for_status()
+        all_slxs = resp.json().get("results", [])
     except (
         requests.ConnectTimeout,
         requests.ConnectionError,
@@ -77,6 +66,83 @@ def get_slxs_with_tag(
         )
         platform_logger.exception(e)
         return []
+
+
+    # ── 2.  Normalise search set once  ──────────────────────────────────────
+    wanted = {
+        (t["name"].lower(), str(t["value"]).lower())
+        for t in tag_list
+        if isinstance(t, dict) and t.get("name") is not None
+    }
+
+    if not wanted:
+        return []
+
+    # ── 3.  Fetch SLXs ──────────────────────────────────────────────────────
+    session = platform.get_authenticated_session()
+    url     = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
+
+    try:
+        resp = session.get(url, timeout=10)
+        resp.raise_for_status()
+        results = resp.json().get("results", [])
+    except (
+        requests.ConnectTimeout,
+        requests.ConnectionError,
+        json.JSONDecodeError,
+    ) as e:
+        warning_log(
+            f"Exception while trying to get SLXs in workspace {rw_workspace}: {e}",
+            str(e),
+            str(type(e)),
+        )
+        platform_logger.exception(e)
+        return []
+
+    # ── 4.  Filter in a single pass ─────────────────────────────────────────
+    matches = []
+    for slx in results:
+        for tag in slx.get("spec", {}).get("tags", []):
+            pair = (tag.get("name", "").lower(), str(tag.get("value", "")).lower())
+            if pair in wanted:
+                matches.append(slx)
+                break                    # stop after first hit for this SLX
+
+    return matches
+    # s = platform.get_authenticated_session()
+    # url = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
+    # matching_slxs = []
+
+    # try:
+    #     response = s.get(url, timeout=10)
+    #     response.raise_for_status()  # Ensure we raise an exception for bad responses
+    #     all_slxs = response.json()  # Parse the JSON content
+    #     results = all_slxs.get("results", [])
+
+    #     for result in results:
+    #         tags = result.get("spec", {}).get("tags", [])
+    #         for tag in tags:
+    #             if any(
+    #                 tag_item["name"] == tag["name"]
+    #                 and tag_item["value"] == tag["value"]
+    #                 for tag_item in tag_list
+    #             ):
+    #                 matching_slxs.append(result)
+    #                 break
+
+    #     return matching_slxs
+    # except (
+    #     requests.ConnectTimeout,
+    #     requests.ConnectionError,
+    #     json.JSONDecodeError,
+    # ) as e:
+    #     warning_log(
+    #         f"Exception while trying to get SLXs in workspace {rw_workspace}: {e}",
+    #         str(e),
+    #         str(type(e)),
+    #     )
+    #     platform_logger.exception(e)
+    #     return []
 
 
 def run_tasks_for_slx(
@@ -440,26 +506,136 @@ def get_slxs_with_entity_reference(
 
     for slx in all_slxs:
         spec = slx.get("spec", {})
-
-        # a) Alias
         corpus = [spec.get("alias", "")]
 
-        # b)   tags -> [{"name": "x", "value": "y"}, ...]
+        # b) tags
         for t in spec.get("tags", []):
-            corpus.extend([t.get("name", ""), t.get("value", "")])
+            name  = t.get("name", "")
+            value = t.get("value", "")
+            corpus.extend([name, value, f"{name}:{value}"])   # <- add pair
 
-        # c)   configProvided -> [{"name": "AZ_RG", "value": "foo"}, ...]
+        # c) configProvided
         for cp in spec.get("configProvided", []):
-            corpus.extend([cp.get("name", ""), cp.get("value", "")])
+            name  = cp.get("name", "")
+            value = cp.get("value", "")
+            corpus.extend([name, value, f"{name}:{value}"])   # <- add pair
 
-        # d)   additionalContext -> {"key": "value", ...}
+        # d) additionalContext
         add_ctx = spec.get("additionalContext", {})
         for k, v in add_ctx.items():
-            corpus.extend([k, str(v)])
+            corpus.extend([k, str(v), f"{k}:{v}"])            # <- add pair
 
-        # Perform case-insensitive substring test
         joined = " ".join(corpus).lower()
         if any(term in joined for term in search_terms):
             matching_slxs.append(slx)
 
     return matching_slxs
+
+def perform_task_search_with_persona(
+    query: str,
+    persona: str,
+    slx_scope: list = None,
+) -> dict:
+    """
+    Perform a task search in the current workspace using a specific persona.
+
+    :param query: The search query (string).
+    :param persona: Persona shortname or fully-qualified (<workspace>--<persona>).
+    :param slx_scope: A list of slxShortNames to limit the search scope (optional).
+
+    :return: Parsed JSON response from the task-search endpoint.
+    """
+    try:
+        rw_workspace = import_platform_variable("RW_WORKSPACE")
+        rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError as e:
+        BuiltIn().log(f"Missing required platform variables: {e}", level="WARN")
+        return {}
+
+    # Normalize persona
+    if "--" not in persona:
+        persona = f"{rw_workspace}--{persona}"
+
+    if slx_scope is None:
+        slx_scope = []
+
+    url = f"{rw_workspace_api_url}/{rw_workspace}/task-search"
+    payload = {
+        "query": [query],
+        "scope": slx_scope,
+        "persona": persona
+    }
+
+    user_token = os.getenv("RW_USER_TOKEN")
+    if user_token:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {user_token}"
+        }
+        session = requests.Session()
+        session.headers.update(headers)
+    else:
+        session = platform.get_authenticated_session()
+
+    BuiltIn().log(f"POST {url} with payload: {json.dumps(payload)}", level="INFO")
+
+    try:
+        response = session.post(url, json=payload, timeout=10, verify=platform.REQUEST_VERIFY)
+        response.raise_for_status()
+        return response.json()
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        BuiltIn().log(f"Task search (with persona) failed: {e}", level="WARN")
+        platform_logger.exception(e)
+        return {}
+
+
+def perform_task_search(
+    query: str,
+    slx_scope: list = None,
+) -> dict:
+    """
+    Perform a task search in the current workspace with no persona.
+
+    :param query: The search query (string).
+    :param slx_scope: A list of slxShortNames to limit the search scope (optional).
+
+    :return: Parsed JSON response from the task-search endpoint.
+    """
+    try:
+        rw_workspace = import_platform_variable("RW_WORKSPACE")
+        rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError as e:
+        BuiltIn().log(f"Missing required platform variables: {e}", level="WARN")
+        return {}
+
+    if slx_scope is None:
+        slx_scope = []
+
+    url = f"{rw_workspace_api_url}/{rw_workspace}/task-search"
+    payload = {
+        "query": [query],
+        "scope": slx_scope
+        # Notice: no 'persona' key here
+    }
+
+    user_token = os.getenv("RW_USER_TOKEN")
+    if user_token:
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {user_token}"
+        }
+        session = requests.Session()
+        session.headers.update(headers)
+    else:
+        session = platform.get_authenticated_session()
+
+    BuiltIn().log(f"POST {url} with payload (no persona): {json.dumps(payload)}", level="INFO")
+
+    try:
+        response = session.post(url, json=payload, timeout=10, verify=platform.REQUEST_VERIFY)
+        response.raise_for_status()
+        return response.json()
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        BuiltIn().log(f"Task search (no persona) failed: {e}", level="WARN")
+        platform_logger.exception(e)
+        return {}
