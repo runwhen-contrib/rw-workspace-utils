@@ -5,14 +5,13 @@ Scope: Global
 """
 
 import re, logging, json, jmespath, requests, os, time
+from typing import List, Tuple, Dict, Any
 from datetime import datetime
 from robot.libraries.BuiltIn import BuiltIn
 
 from RW import platform
 from RW.Core import Core
 
-# import bare names for robot keyword names
-# from .platform_utils import *
 
 
 logger = logging.getLogger(__name__)
@@ -24,126 +23,68 @@ SECRET_PREFIX = "secret__"
 SECRET_FILE_PREFIX = "secret_file__"
 
 
-def get_slxs_with_tag(
-    tag_list: list,
-) -> list:
-    """Given a list of tags, return all SLXs in the workspace that have those tags.
-
-    Args:
-        tag_list (list): the given list of tags as dictionaries
-
-    Returns:
-        list: List of SLXs that match the given tags
+def get_slxs_with_tag(tag_list: List[Any]) -> List[Dict]:
     """
-    # ------------------------------------------------------------------ #
-    # 1)  Gather workspace-scoped variables
-    # ------------------------------------------------------------------ #
+    Return all SLXs whose *spec.tags* contain at least one tag that matches
+    any element in *tag_list* (case-insensitive).
+
+    `tag_list` may contain either
+        • {"name": "...", "value": "..."} dictionaries
+        • "name:value" strings
+    """
+    # 1. Workspace variables -------------------------------------------------
     try:
-        rw_workspace        = import_platform_variable("RW_WORKSPACE")
-        rw_workspace_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+        ws       = import_platform_variable("RW_WORKSPACE")
+        api_root = import_platform_variable("RW_WORKSPACE_API_URL")
     except ImportError:
         return []
 
-    # ------------------------------------------------------------------ #
-    # 2)  Fetch all SLXs for the workspace
-    # ------------------------------------------------------------------ #
-    session = platform.get_authenticated_session()
-    url     = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
-
-    try:
-        resp = session.get(url, timeout=10)
-        resp.raise_for_status()
-        all_slxs = resp.json().get("results", [])
-    except (
-        requests.ConnectTimeout,
-        requests.ConnectionError,
-        json.JSONDecodeError,
-    ) as e:
-        warning_log(
-            f"Exception while trying to get SLXs in workspace {rw_workspace}: {e}",
-            str(e),
-            str(type(e)),
-        )
-        platform_logger.exception(e)
-        return []
-
-
-    # ── 2.  Normalise search set once  ──────────────────────────────────────
-    wanted = {
-        (t["name"].lower(), str(t["value"]).lower())
-        for t in tag_list
-        if isinstance(t, dict) and t.get("name") is not None
-    }
-
+    # 2. Build the wanted (name,value) set -----------------------------------
+    wanted: set[Tuple[str, str]] = set()
+    for item in tag_list:
+        if isinstance(item, dict):
+            n, v = item.get("name"), item.get("value")
+            if n is not None and v is not None:
+                wanted.add((str(n).strip().lower(), str(v).strip().lower()))
+        elif isinstance(item, str) and ":" in item:
+            n, v = item.split(":", 1)
+            wanted.add((n.strip().lower(), v.strip().lower()))
     if not wanted:
         return []
 
-    # ── 3.  Fetch SLXs ──────────────────────────────────────────────────────
-    session = platform.get_authenticated_session()
-    url     = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
+    # 3. Paginate through all SLXs ------------------------------------------
+    sess     = platform.get_authenticated_session()
+    url      = f"{api_root}/{ws}/slxs"
+    matches: List[Dict] = []
 
-    try:
-        resp = session.get(url, timeout=10)
-        resp.raise_for_status()
-        results = resp.json().get("results", [])
-    except (
-        requests.ConnectTimeout,
-        requests.ConnectionError,
-        json.JSONDecodeError,
-    ) as e:
-        warning_log(
-            f"Exception while trying to get SLXs in workspace {rw_workspace}: {e}",
-            str(e),
-            str(type(e)),
-        )
-        platform_logger.exception(e)
-        return []
+    while url:
+        try:
+            resp = sess.get(url, timeout=10)
+            resp.raise_for_status()
+            payload = resp.json()
+        except (
+            requests.ConnectTimeout,
+            requests.ConnectionError,
+            json.JSONDecodeError,
+        ) as e:
+            warning_log(f"Fetching SLXs in {ws} failed: {e}", str(e), str(type(e)))
+            platform_logger.exception(e)
+            break
 
-    # ── 4.  Filter in a single pass ─────────────────────────────────────────
-    matches = []
-    for slx in results:
-        for tag in slx.get("spec", {}).get("tags", []):
-            pair = (tag.get("name", "").lower(), str(tag.get("value", "")).lower())
-            if pair in wanted:
-                matches.append(slx)
-                break                    # stop after first hit for this SLX
+        for slx in payload.get("results", []):
+            for tag in slx.get("spec", {}).get("tags", []):
+                pair = (
+                    str(tag.get("name", "")).strip().lower(),
+                    str(tag.get("value", "")).strip().lower(),
+                )
+                if pair in wanted:
+                    matches.append(slx)
+                    break       # one hit is enough for this SLX
+
+        url = payload.get("next")    # None when we’re on the last page
 
     return matches
-    # s = platform.get_authenticated_session()
-    # url = f"{rw_workspace_api_url}/{rw_workspace}/slxs"
-    # matching_slxs = []
-
-    # try:
-    #     response = s.get(url, timeout=10)
-    #     response.raise_for_status()  # Ensure we raise an exception for bad responses
-    #     all_slxs = response.json()  # Parse the JSON content
-    #     results = all_slxs.get("results", [])
-
-    #     for result in results:
-    #         tags = result.get("spec", {}).get("tags", [])
-    #         for tag in tags:
-    #             if any(
-    #                 tag_item["name"] == tag["name"]
-    #                 and tag_item["value"] == tag["value"]
-    #                 for tag_item in tag_list
-    #             ):
-    #                 matching_slxs.append(result)
-    #                 break
-
-    #     return matching_slxs
-    # except (
-    #     requests.ConnectTimeout,
-    #     requests.ConnectionError,
-    #     json.JSONDecodeError,
-    # ) as e:
-    #     warning_log(
-    #         f"Exception while trying to get SLXs in workspace {rw_workspace}: {e}",
-    #         str(e),
-    #         str(type(e)),
-    #     )
-    #     platform_logger.exception(e)
-    #     return []
-
+ 
 
 def run_tasks_for_slx(
     slx: str,
@@ -448,6 +389,64 @@ def import_related_runsession_details(
         # Sleep before next poll
         time.sleep(poll_interval)
 
+def get_workspace_slxs(
+    rw_api_url: str = "https://papi.beta.runwhen.com/api/v3",
+    api_token: platform.Secret = None,
+    rw_workspace: str = "my-workspace"
+) -> str:
+    """
+    Get *all* SLXs in a RunWhen workspace, transparently handling pagination.
+
+    Args are kept 100 % identical to the original.
+    Returns:
+        JSON string of the combined payload:
+        {
+          "count":  <total>,
+          "next":   null,
+          "previous": null,
+          "results": [ …all SLXs… ]
+        }
+        On error, the empty string "" (unchanged behaviour).
+    """
+    url     = f"{rw_api_url}/workspaces/{rw_workspace}/slxs"
+    headers = {
+        "Content-Type":  "application/json",
+        "Authorization": f"Bearer {api_token.value}",
+    }
+
+    all_results = []
+    total_count = None
+
+    try:
+        while url:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+
+            payload      = response.json()          # one page
+            total_count  = payload.get("count", 0)  # first page value is fine
+            all_results += payload.get("results", [])
+
+            url = payload.get("next")               # None on last page
+
+        combined = {
+            "count":    len(all_results) if total_count is None else total_count,
+            "next":     None,
+            "previous": None,
+            "results":  all_results,
+        }
+        return json.dumps(combined)
+
+    except (requests.ConnectTimeout,
+            requests.ConnectionError,
+            json.JSONDecodeError) as e:
+        warning_log(
+            f"Exception while fetching SLXs in workspace '{rw_workspace}': {e}",
+            str(e),
+            str(type(e)),
+        )
+        platform_logger.exception(e)
+        return ""
+
 def get_slxs_with_entity_reference(
     entity_refs: list[str],
 ) -> list:
@@ -639,3 +638,56 @@ def perform_task_search(
         BuiltIn().log(f"Task search (no persona) failed: {e}", level="WARN")
         platform_logger.exception(e)
         return {}
+
+def build_task_report_md(
+    search_response: dict,
+    score_threshold: float = 0.7,
+    heading: str = "### Candidate Tasks (score ≥ {th})",
+) -> str:
+    """
+    Build a Markdown table of tasks whose `score` >= threshold, showing:
+
+        | Score | Access | SLX Alias | Task title |
+
+    *Access* is taken from the first tag that starts with "access:" in
+    `codebundleTaskTags` (falls back to "—" if none).
+    """
+    # ------------ filter & sort ------------------------------------------------
+    tasks = [
+        t for t in search_response.get("tasks", [])
+        if t.get("score", 0) >= score_threshold
+    ]
+    if not tasks:
+        return f"**No tasks found above confidence of {score_threshold}**"
+
+    tasks.sort(key=lambda t: t["score"], reverse=True)
+
+    # ------------ header -------------------------------------------------------
+    lines: list[str] = [heading.format(th=score_threshold), ""]
+    lines.append("| Score | Access | SLX Alias | Task title |")
+    lines.append("|:----:|:-------|-----------|------------|")
+
+    # ------------ rows ---------------------------------------------------------
+    def first_access_tag(tags: list[str]) -> str:
+        for tag in tags or []:
+            if tag.startswith("access:"):
+                return tag.split(":", 1)[1]   # read-only / read-write
+        return "—"                            # em-dash if none found
+
+    for t in tasks:
+        score = f"{t['score']:.3f}"
+
+        if "workspaceTask" in t:           # new structure
+            ws   = t["workspaceTask"]
+            alias = ws.get("slxAlias") or ws.get("slxName")
+            title = ws.get("resolvedTitle") or ws.get("unresolvedTitle")
+            access = first_access_tag(t.get("codebundleTaskTags"))
+        else:                              # old structure
+            alias = t.get("slxAlias") or t.get("slxName")
+            title = t.get("resolvedTaskName") or t.get("taskName")
+            access = first_access_tag(t.get("codebundleTaskTags"))
+
+        lines.append(f"| {score} | {access} | {alias} | {title} |")
+
+    lines.append("")   # trailing newline
+    return "\n".join(lines)
