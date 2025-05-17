@@ -15,9 +15,7 @@ Library           RW.RunSession
 *** Keywords ***
 Suite Initialization
     ${DRY_RUN_MODE}=    RW.Core.Import User Variable    DRY_RUN_MODE
-    ...    type=string
     ...    description=Whether to capture the webhook details in dry-run mode, reporting what tasks will be run but not executing them. True or False  
-    ...    pattern=\w*
     ...    enum=[true,false]
     ...    default=true
     ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
