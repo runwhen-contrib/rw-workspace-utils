@@ -71,7 +71,8 @@ Add Tasks to RunSession from AlertManager Webhook Details
                 ${admin_tasks_results}=    RW.Workspace.Build Task Report Md 
                 ...    search_response=${admin_search}
                 ...    score_threshold=0
-                RW.Core.Add To Report    \# Tasks found with Admin permissions (these will NOT be run)\n${admin_tasks_results}
+                RW.Core.Add To Report    \# Tasks found with Admin permissions (these will NOT be run)
+                RW.Core.Add Pre To Report    ${admin_tasks_results}
 
 
                 # Perform search with Persona that is attached to the RunSession
@@ -84,7 +85,7 @@ Add Tasks to RunSession from AlertManager Webhook Details
                 ${tasks_to_run}=    RW.Workspace.Build Task Report Md 
                 ...    search_response=${search_with_persona}
                 ...    score_threshold=${run_confidence}
-                RW.Core.Add To Report    ${tasks_to_run}
+                RW.Core.Add Pre To Report    ${tasks_to_run}
 
                 IF    $DRY_RUN_MODE == "false"
                     RW.Core.Add To Report    Dry-run mode is false. Adding tasks to RunSesssion...
