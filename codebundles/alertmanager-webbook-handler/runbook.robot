@@ -38,6 +38,7 @@ Add Tasks to RunSession from AlertManager Webhook Details
     [Tags]    webhook    grafana    alertmanager    alert    runwhen
 
     RW.Core.Add To Report    Webhook received with state: ${WEBHOOK_JSON["status"]}
+    RW.Core.Add Pre To Report   ${WEBHOOK_JSON["status"]}
 
     IF    $WEBHOOK_JSON["status"] == "firing"
         Log    Parsing webhook data ${WEBHOOK_JSON}
@@ -47,7 +48,7 @@ Add Tasks to RunSession from AlertManager Webhook Details
         ${common_labels_list}=    Evaluate
         ...    [f"{k}:{v}" for k, v in ${WEBHOOK_JSON["commonLabels"]}.items()]
         
-        RW.Core.Add To Report    RunSession assigned to ${persona}, with run confidence ${run_confidence}, looking to scope search to the following commonLabels ${common_labels_list}
+        RW.Core.Add To Report    RunSession assigned to ${CURRENT_SESSION_JSON["personaShortName"]}, with run confidence ${run_confidence}, looking to scope search to the following commonLabels ${common_labels_list}
         
         ${slx_list}=    RW.Workspace.Get Slxs With Tag
         ...    tag_list=${common_labels_list}
