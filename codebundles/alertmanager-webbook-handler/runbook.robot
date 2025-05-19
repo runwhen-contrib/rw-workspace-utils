@@ -11,6 +11,7 @@ Library           OperatingSystem
 Library           RW.CLI
 Library           RW.Workspace
 Library           RW.RunSession
+Library           Collections
 
 *** Keywords ***
 Suite Initialization
@@ -59,66 +60,67 @@ Add Tasks to RunSession from AlertManager Webhook Details
         ELSE
 
             RW.Core.Add To Report    Found SLX matches..continuing on with search. 
-            FOR    ${slx}    IN    @{slx_list} 
-                Log    ${slx["shortName"]} has matched
-                ${scope}=    Create List    ${slx["shortName"]}
-                ${qry}=      Set Variable    ${slx["shortName"]} Health
+            ${slx_scopes}=    Create List
+            FOR    ${slx}    IN    @{slx_list}
+                Append To List    ${slx_scopes}    ${slx["shortName"]}
+            END
+            Log    ${slx_scopes} has matched
+            ${qry}=      Set Variable    ${slx["shortName"]} Health
 
-                # Perform search with Admin permissions - These tasks will never be run
-                ${admin_search}=    RW.Workspace.Perform Task Search
-                ...    query=${qry}
-                ...    slx_scope=${scope}
+            # Perform search with Admin permissions - These tasks will never be run
+            ${admin_search}=    RW.Workspace.Perform Task Search
+            ...    query=${qry}
+            ...    slx_scope=${slx_scopes}
 
-                ${admin_tasks_results}=    RW.Workspace.Build Task Report Md 
-                ...    search_response=${admin_search}
-                ...    score_threshold=0
-                RW.Core.Add To Report    \# Tasks found with Admin permissions (these will NOT be run)
-                RW.Core.Add Pre To Report    ${admin_tasks_results}
+            ${admin_tasks_results}=    RW.Workspace.Build Task Report Md 
+            ...    search_response=${admin_search}
+            ...    score_threshold=0
+            RW.Core.Add To Report    \# Tasks found with Admin permissions (these will NOT be run)
+            RW.Core.Add Pre To Report    ${admin_tasks_results}
 
 
-                # Perform search with Persona that is attached to the RunSession
-                ${search_with_persona}=    RW.Workspace.Perform Task Search With Persona
-                ...    query=${qry}
-                ...    slx_scope=${scope}
-                ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
-                RW.Core.Add To Report    \# Tasks found with Engineering Assistant permissions (${CURRENT_SESSION_JSON["personaShortName"]})
+            # Perform search with Persona that is attached to the RunSession
+            ${search_with_persona}=    RW.Workspace.Perform Task Search With Persona
+            ...    query=${qry}
+            ...    slx_scope=${slx_scopes}
+            ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
+            RW.Core.Add To Report    \# Tasks found with Engineering Assistant permissions (${CURRENT_SESSION_JSON["personaShortName"]})
 
-                ${tasks_to_run}=    RW.Workspace.Build Task Report Md 
+            ${tasks_to_run}=    RW.Workspace.Build Task Report Md 
+            ...    search_response=${search_with_persona}
+            ...    score_threshold=${run_confidence}
+            RW.Core.Add Pre To Report    ${tasks_to_run}
+
+            IF    $DRY_RUN_MODE == "false"
+                RW.Core.Add To Report    Dry-run mode is false. Adding tasks to RunSesssion...
+                # Preview first – cheap and tells us whether there is anything to do
+                ${patch_preview}=    RW.RunSession.Add Tasks to RunSession From Search
                 ...    search_response=${search_with_persona}
                 ...    score_threshold=${run_confidence}
-                RW.Core.Add Pre To Report    ${tasks_to_run}
+                ...    dry_run=True
 
-                IF    $DRY_RUN_MODE == "false"
-                    RW.Core.Add To Report    Dry-run mode is false. Adding tasks to RunSesssion...
-                    # Preview first – cheap and tells us whether there is anything to do
-                    ${patch_preview}=    RW.RunSession.Add Tasks to RunSession From Search
+                IF    ${patch_preview} == {}
+                    RW.Core.Add To Report    No tasks exceeded confidence ${run_confidence} for ${slx["shortName"]}. Skipping patch.    INFO
+                ELSE
+                    Log    ${len(${patch_preview["runRequests"]})} task(s) will be added – sending patch.    INFO
+
+                    ${patch_result}=    RW.RunSession.Add Tasks to RunSession From Search
                     ...    search_response=${search_with_persona}
                     ...    score_threshold=${run_confidence}
-                    ...    dry_run=True
+                    ...    dry_run=False
 
-                    IF    ${patch_preview} == {}
-                        RW.Core.Add To Report    No tasks exceeded confidence ${run_confidence} for ${slx["shortName"]}. Skipping patch.    INFO
-                    ELSE
-                        Log    ${len(${patch_preview["runRequests"]})} task(s) will be added – sending patch.    INFO
-
-                        ${patch_result}=    RW.RunSession.Add Tasks to RunSession From Search
-                        ...    search_response=${search_with_persona}
-                        ...    score_threshold=${run_confidence}
-                        ...    dry_run=False
-
-                        IF    ${patch_result} == {}
-                            RW.Core.Add Issue
-                            ...    severity=3
-                            ...    expected=RunSession patch should be successful
-                            ...    actual=RunSession patch failed – empty response
-                            ...    title=Could not patch RunSession `${CURRENT_SESSION_JSON["id"]}` with tasks from `${slx["shortName"]}`
-                            ...    reproduce_hint=Apply patch to RunSession ${CURRENT_SESSION_JSON["id"]}
-                            ...    details=See debug logs or backend response body.
-                            ...    next_steps=Inspect runrequest logs or contact RunWhen support.
-                        END
+                    IF    ${patch_result} == {}
+                        RW.Core.Add Issue
+                        ...    severity=3
+                        ...    expected=RunSession patch should be successful
+                        ...    actual=RunSession patch failed – empty response
+                        ...    title=Could not patch RunSession `${CURRENT_SESSION_JSON["id"]}` with tasks from `${slx["shortName"]}`
+                        ...    reproduce_hint=Apply patch to RunSession ${CURRENT_SESSION_JSON["id"]}
+                        ...    details=See debug logs or backend response body.
+                        ...    next_steps=Inspect runrequest logs or contact RunWhen support.
                     END
-                END            
-            END        
+                END
+            END                   
         
         END
     END
