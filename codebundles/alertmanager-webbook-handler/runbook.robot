@@ -65,7 +65,7 @@ Add Tasks to RunSession from AlertManager Webhook Details
                 Append To List    ${slx_scopes}    ${slx["shortName"]}
             END
             Log    ${slx_scopes} has matched
-            ${qry}=      Set Variable    ${slx["shortName"]} Health
+            ${qry}=      Set Variable    ${slx_scopes[0]} Health
 
             # Perform search with Admin permissions - These tasks will never be run
             ${admin_search}=    RW.Workspace.Perform Task Search
