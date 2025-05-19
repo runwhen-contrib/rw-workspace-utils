@@ -19,6 +19,7 @@ Suite Initialization
     ...    description=Whether to capture the webhook details in dry-run mode, reporting what tasks will be run but not executing them. True or False  
     ...    enum=[true,false]
     ...    default=true
+    Set Suite Variable    ${DRY_RUN_MODE}    ${DRY_RUN_MODE}
     ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
     ${CURRENT_SESSION_JSON}=    Evaluate    json.loads(r'''${CURRENT_SESSION}''')    json
     Set Suite Variable    ${CURRENT_SESSION_JSON}
