@@ -616,24 +616,37 @@ def build_task_report_md(
     search_response: Dict,
     score_threshold: float = 0.7,
     heading: str = "### Candidate Tasks (score ≥ {th})",
-) -> str:
+) -> Tuple[str, int]:
     """
-    Build a Markdown table of tasks whose score ≥ threshold:
+    Build a Markdown table of tasks whose score ≥ threshold and
+    ALSO return the *total* number of tasks in the search_response.
 
-        | Score | Access | SLX Alias | Task title |
+    Returns:
+        (markdown_table: str, total_tasks: int)
     """
-    tasks = [t for t in search_response.get("tasks", [])
-             if t.get("score", 0) >= score_threshold]
+    tasks = [
+        t for t in search_response.get("tasks", [])
+        if t.get("score", 0) >= score_threshold
+    ]
+    total_tasks = len(tasks)
+    
+    # ── early-out when nothing passes the threshold ───────────────
     if not tasks:
-        return f"**No tasks found above confidence of {score_threshold}**"
+        md = f"**No tasks found above confidence of {score_threshold}**"
+        return md, total_tasks
 
+    # ── build the markdown table ─────────────────────────────────
     tasks.sort(key=lambda t: t.get("score", 0), reverse=True)
     lines: List[str] = [heading.format(th=score_threshold), ""]
-    lines.append("| Score | Access | SLX Alias | Task title |")
-    lines.append("|:----:|:-------|-----------|------------|")
+    lines += [
+        "| Score | Access | SLX Alias | Task title |",
+        "|:----:|:-------|-----------|------------|",
+    ]
 
-    def first_access(tags: List[str]) -> str:
-        for tg in tags or []:
+    def first_access(tags: List[str] | None) -> str:
+        if not tags:
+            return "—"
+        for tg in tags:
             if tg.startswith("access:"):
                 return tg.split(":", 1)[1]
         return "—"
@@ -650,5 +663,6 @@ def build_task_report_md(
         access = first_access(t.get("codebundleTaskTags"))
         lines.append(f"| {score} | {access} | {alias} | {title} |")
 
-    lines.append("")
-    return "\n".join(lines)
+    lines.append("")  # trailing newline
+    md = "\n".join(lines)
+    return md, total_tasks

@@ -61,7 +61,7 @@ Start RunSession From Dynatrace Webhook Details
             END
             ${qry}=    Set Variable    ${slx_scopes[0]} Health
 
-            # 3) Get persona / confidence threshold
+            # Get persona / confidence threshold
             ${persona}=    RW.RunSession.Get Persona Details
             ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
             ${run_confidence}=    Set Variable    ${persona["spec"]["run"]["confidenceThreshold"]}
@@ -79,41 +79,27 @@ Start RunSession From Dynatrace Webhook Details
                 END
                 Add Pre To Report    Expanding scope to include the following SLXs: ${slx_scopes}
             END
-            # 4) Admin-level discovery (report only)
+
+            #  Admin-level discovery (report only)
             # ${admin_search}=    RW.Workspace.Perform Task Search
             # ...                query=${qry}
             # ...                slx_scope=${slx_scopes}
-            # ${admin_md}=       RW.Workspace.Build Task Report Md
+            # ${admin_tasks_md}    ${admin_tasks_total}=       RW.Workspace.Build Task Report Md
             # ...    search_response=${admin_search}
             # ...    score_threshold=0
 
-            # 4) Admin-level discovery (report only)
-            # TRY
-            #     ${admin_search}=    RW.Workspace.Perform Task Search
-            #     ...                query=${qry}
-            #     ...                slx_scope=${slx_scopes}
-            # EXCEPT    *    AS    ${err}
-            #     Log    [WARN] admin_search failed – ${err}
-            #     ${admin_search}=    Create Dictionary          # ← empty dict fallback
-            # END
-
-            # ${admin_md}=    RW.Workspace.Build Task Report Md
-            # ...    search_response=${admin_search}
-            # ...    score_threshold=0
-            # RW.Core.Add To Report       \# Tasks visible to Admin (not executed)
-            # RW.Core.Add Pre To Report   ${admin_md}
-
-            # 5) Persona-restricted discovery
+            # Persona-restricted discovery
             ${persona_search}=    RW.Workspace.Perform Task Search With Persona
             ...                    query=${qry}
             ...                    persona=${CURRENT_SESSION_JSON["personaShortName"]}
             ...                    slx_scope=${slx_scopes}
-            ${tasks_md}=          RW.Workspace.Build Task Report Md
+            ${tasks_md}    ${total_persona_tasks}=          RW.Workspace.Build Task Report Md
             ...                    search_response=${persona_search}
             ...                    score_threshold=${run_confidence}
             RW.Core.Add To Report    \# Tasks meeting confidence ≥${run_confidence}
             RW.Core.Add Pre To Report    ${tasks_md}
-            IF    ${persona_search} == {'tasks': [], 'links': [], 'owners': []} or ${persona_search} == {'tasks': [], 'owners': []} 
+
+            IF    ${total_persona_tasks} == 0
                 RW.Core.Add To Report    No tasks cleared confidence threshold – cannot create RunSession.
             ELSE
                 IF    '${DRY_RUN_MODE}' == 'false'
@@ -129,7 +115,6 @@ Start RunSession From Dynatrace Webhook Details
                         ${runsession_url}=     RW.RunSession.Get RunSession Url
                         ...    rw_runsession=${runsession["id"]}         
                         RW.Core.Add To Report    Started runsession [${runsession["id"]}](${runsession_url})
-
                     ELSE
                         RW.Core.Add To Report    RunSession did not create successfully.
                         RW.Core.Add Issue
