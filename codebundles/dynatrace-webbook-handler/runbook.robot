@@ -22,15 +22,15 @@ Suite Initialization
     ...    default=true
     Set Suite Variable    ${DRY_RUN_MODE}    ${DRY_RUN_MODE}
 
-    # ${WEBHOOK_DATA}=     RW.Workspace.Import Memo Variable    
-    # ...    key=webhookJson
-    # ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
-    # Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
-
-    # Local test data
-    ${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
+    ${WEBHOOK_DATA}=     RW.Workspace.Import Memo Variable    
+    ...    key=webhookJson
     ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
-    Set Suite Variable    ${WEBHOOK_JSON}
+    Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
+
+    # # Local test data
+    # ${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
+    # ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
+    # Set Suite Variable    ${WEBHOOK_JSON}
 
     ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
     ${CURRENT_SESSION_JSON}=    Evaluate    json.loads(r'''${CURRENT_SESSION}''')    json
@@ -39,7 +39,7 @@ Suite Initialization
 
 *** Tasks ***
 Start RunSession From Dynatrace Webhook Details
-    [Documentation]    Parse webhook ➜ match SLXs ➜ search tasks ➜ (optionally) patch RunSession
+    [Documentation]    Parse webhook ➜ match SLXs ➜ search tasks ➜ (optionally) new RunSession
     [Tags]    webhook    dynatrace    alert    runwhen
 
     RW.Core.Add To Report    Dynatrace problem state: ${WEBHOOK_JSON["state"]}

@@ -24,15 +24,15 @@ Suite Initialization
     ${CURRENT_SESSION_JSON}=    Evaluate    json.loads(r'''${CURRENT_SESSION}''')    json
     Set Suite Variable    ${CURRENT_SESSION_JSON}
 
-    # ${WEBHOOK_DATA}=     RW.Workspace.Import Memo Variable    
-    # ...    key=webhookJson
-    # ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
-    # Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
-
-    # Local test data
-    ${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
+    ${WEBHOOK_DATA}=     RW.Workspace.Import Memo Variable    
+    ...    key=webhookJson
     ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
-    Set Suite Variable    ${WEBHOOK_JSON}
+    Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
+
+    # # Local test data
+    # ${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
+    # ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
+    # Set Suite Variable    ${WEBHOOK_JSON}
 
 *** Tasks ***
 Add Tasks to RunSession from AlertManager Webhook Details
