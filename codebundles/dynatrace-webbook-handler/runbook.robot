@@ -10,6 +10,7 @@ Library           RW.platform
 Library           OperatingSystem
 Library           RW.CLI
 Library           RW.Workspace
+Library           RW.RunSession
 Library           RW.Dynatrace
 Library           Collections
 
@@ -25,48 +26,19 @@ Suite Initialization
     # ...    key=webhookJson
     # ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
     # Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
-    ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
-    Set Suite Variable    ${CURRENT_SESSION}
 
     # Local test data
     ${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
     ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
     Set Suite Variable    ${WEBHOOK_JSON}
 
+    ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
+    ${CURRENT_SESSION_JSON}=    Evaluate    json.loads(r'''${CURRENT_SESSION}''')    json
+    Set Suite Variable    ${CURRENT_SESSION_JSON}
+
+
 *** Tasks ***
 Start RunSession From Dynatrace Webhook Details
-    # [Documentation]    Parse the dynatrace webhook and route and SLX where entities match search results
-    # [Tags]    webhook    dynatrace    alert    runwhen
-
-    # RW.Core.Add To Report    Dynatrace Problem Details:\n ${WEBHOOK_JSON["problemDetailsMarkdown"]}
-    # RW.Core.Add Pre To Report    Full payload:\n ${WEBHOOK_JSON}
-
-
-    # IF    '${WEBHOOK_JSON["state"]}' == 'OPEN'
-    #     # # 1) Gather the impacted entities list that came in the webhook
-    #     ${entity_names}=    RW.Dynatrace.Parse Dynatrace Entities    ${WEBHOOK_JSON}
-    #     RW.Core.Add Pre To Report      Found entity names: ${entity_names}
-
-    #     # 2) Find any slxs that might reference those entity names
-    #     ${slx_list}=        RW.Workspace.Get Slxs With Entity Reference    ${entity_names}
-    #     Log                 Found SLXs: ${slx_list}
-        
-    #     #Perform Task Seach
-    #     ${persona_search_tasks}=    RW.Workspace.Perform Task Search With Persona
-    #     ...    query="${slx_list[0]} Health"
-    #     ...    persona="${CURRENT_SESSION["personaShortName"]}"
-    #     ...    slx_scope=${slx_list}
-
-
-    #     # 3) Add those SLXs to the RunSession
-    #     IF  len(${slx_list}) > 0
-    #         FOR    ${slx}    IN    @{slx_list} 
-    #             RW.Core.Add To Report    ${slx["shortName"]} has matched
-    #             #${runrequest}=    RW.Workspace.Run Tasks for SLX
-    #             # ...    slx=${slx["shortName"]}
-    #         END
-    #     END
-    # END
     [Documentation]    Parse webhook ➜ match SLXs ➜ search tasks ➜ (optionally) patch RunSession
     [Tags]    webhook    dynatrace    alert    runwhen
 
@@ -88,20 +60,48 @@ Start RunSession From Dynatrace Webhook Details
                 Append To List    ${slx_scopes}    ${slx["shortName"]}
             END
             ${qry}=    Set Variable    ${slx_scopes[0]} Health
-            RW.Core.Add To Report    SLX matches: ${slx_scopes}; query='${qry}'
 
             # 3) Get persona / confidence threshold
             ${persona}=    RW.RunSession.Get Persona Details
-            ...            persona=${CURRENT_SESSION_JSON["personaShortName"]}
+            ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
             ${run_confidence}=    Set Variable    ${persona["spec"]["run"]["confidenceThreshold"]}
 
+            # A scope of a single SLX tends to present search issues. Add all SLXs from the same group if we only have one SLX.
+            IF    len(@{slx_scopes}) == 1
+                ${config}=    RW.Workspace.Get Workspace Config
+
+                ${nearby_slxs}=    RW.Workspace.Get Nearby Slxs
+                ...    workspace_config=${config}
+                ...    slx_name=${slx_scopes[0]}
+                @{nearby_slx_list}    Convert To List    ${nearby_slxs}
+                FOR    ${slx}    IN    @{nearby_slx_list}
+                    Append To List    ${slx_scopes}    ${slx}
+                END
+                Add Pre To Report    Expanding scope to include the following SLXs: ${slx_scopes}
+            END
             # 4) Admin-level discovery (report only)
-            ${admin_search}=    RW.Workspace.Perform Task Search
-            ...                query=${qry}
-            ...                slx_scope=${slx_scopes}
-            ${admin_md}=       RW.Workspace.Build Task Report Md    ${admin_search}    0
-            RW.Core.Add To Report    \# Tasks visible to Admin (not executed)
-            RW.Core.Add Pre To Report    ${admin_md}
+            # ${admin_search}=    RW.Workspace.Perform Task Search
+            # ...                query=${qry}
+            # ...                slx_scope=${slx_scopes}
+            # ${admin_md}=       RW.Workspace.Build Task Report Md
+            # ...    search_response=${admin_search}
+            # ...    score_threshold=0
+
+            # 4) Admin-level discovery (report only)
+            # TRY
+            #     ${admin_search}=    RW.Workspace.Perform Task Search
+            #     ...                query=${qry}
+            #     ...                slx_scope=${slx_scopes}
+            # EXCEPT    *    AS    ${err}
+            #     Log    [WARN] admin_search failed – ${err}
+            #     ${admin_search}=    Create Dictionary          # ← empty dict fallback
+            # END
+
+            # ${admin_md}=    RW.Workspace.Build Task Report Md
+            # ...    search_response=${admin_search}
+            # ...    score_threshold=0
+            # RW.Core.Add To Report       \# Tasks visible to Admin (not executed)
+            # RW.Core.Add Pre To Report   ${admin_md}
 
             # 5) Persona-restricted discovery
             ${persona_search}=    RW.Workspace.Perform Task Search With Persona
@@ -113,36 +113,37 @@ Start RunSession From Dynatrace Webhook Details
             ...                    score_threshold=${run_confidence}
             RW.Core.Add To Report    \# Tasks meeting confidence ≥${run_confidence}
             RW.Core.Add Pre To Report    ${tasks_md}
-
-            # 6) Optional RunSession patch
-            IF    '${DRY_RUN_MODE}' == 'false'
-                RW.Core.Add To Report    Dry-run disabled – previewing patch …
-                ${preview}=    RW.RunSession.Add Tasks to RunSession From Search
-                ...            search_response=${persona_search}
-                ...            score_threshold=${run_confidence}
-                ...            dry_run=True
-
-                IF    ${preview} == {}
-                    RW.Core.Add To Report    No tasks cleared confidence threshold – nothing to patch.
-                ELSE
-                    Log    ${len(${preview["runRequests"]})} task(s) will be added – sending patch.
-                    ${patch}=    RW.RunSession.Add Tasks to RunSession From Search
-                    ...          search_response=${persona_search}
-                    ...          score_threshold=${run_confidence}
-                    ...          dry_run=False
-
-                    IF    ${patch} == {}
-                        RW.Core.Add Issue
-                        ...    severity=3
-                        ...    expected=RunSession patch succeeds
-                        ...    actual=Patch returned empty response
-                        ...    title=Failed to add tasks to RunSession ${CURRENT_SESSION_JSON["id"]}
-                        ...    reproduce_hint=Re-run webhook handler in debug
-                        ...    next_steps=Inspect backend logs or contact RunWhen support
-                    END
-                END
+            IF    ${persona_search} == {'tasks': [], 'links': [], 'owners': []} or ${persona_search} == {'tasks': [], 'owners': []} 
+                RW.Core.Add To Report    No tasks cleared confidence threshold – cannot create RunSession.
             ELSE
-                RW.Core.Add To Report    Dry-run mode active – no RunSession patch executed.
+                IF    '${DRY_RUN_MODE}' == 'false'
+                    RW.Core.Add To Report    Dry-run disabled – creating Runsession …
+                    ${runsession}=    RW.RunSession.Create RunSession from Task Search
+                    ...    search_response=${persona_search}
+                    ...    persona_shortname=${CURRENT_SESSION_JSON["personaShortName"]}
+                    ...    score_threshold=${run_confidence}
+                    ...    runsession_prefix=dynatrace-${WEBHOOK_JSON["problemId"]}
+                    ...    notes=${CURRENT_SESSION_JSON["notes"]}
+                    ...    source=${CURRENT_SESSION_JSON["source"]}
+                    IF    $runsession != {}
+                        ${runsession_url}=     RW.RunSession.Get RunSession Url
+                        ...    rw_runsession=${runsession["id"]}         
+                        RW.Core.Add To Report    Started runsession [${runsession["id"]}](${runsession_url})
+
+                    ELSE
+                        RW.Core.Add To Report    RunSession did not create successfully.
+                        RW.Core.Add Issue
+                        ...    severity=2
+                        ...    expected=RunSession should be created successfully
+                        ...    actual=RunSession was not created properly
+                        ...    title=Could create RunSession from `${CURRENT_SESSION_JSON["source"]}`
+                        ...    reproduce_hint=Try to create new RunSession
+                        ...    details=See debug logs or backend response body.
+                        ...    next_steps=Inspect runrequest logs or contact RunWhen support.
+                    END
+                ELSE
+                    RW.Core.Add To Report    Dry-run mode active – no RunSession created.
+                END
             END
         END
     ELSE

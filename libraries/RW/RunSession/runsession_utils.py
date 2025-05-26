@@ -223,6 +223,104 @@ def get_most_referenced_resource(data: str):
     
     return most_common_resource[0][0] if most_common_resource else "No keywords found"
 
+def create_runsession_from_task_search(
+    *,
+    search_response: dict,
+    persona_shortname: str = "",
+    source: str = "searchQuery",
+    score_threshold: float = 0.3,
+    runsession_prefix: str = "automated",
+    notes: str = "",
+    api_token: platform.Secret | None = None,
+    rw_api_url: str | None = None,
+    rw_workspace: str | None = None,
+    dry_run: bool = False,
+) -> dict | str:
+    """Create a RunSession from a task-search response."""
+
+    # ── 0. workspace / API root ────────────────────────────────────────────
+    try:
+        if rw_workspace is None:
+            rw_workspace = import_platform_variable("RW_WORKSPACE")
+        if rw_api_url is None:
+            rw_api_url = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError as e:
+        BuiltIn().log(f"[create_runsession] env var missing: {e}", level="WARN")
+        return {}
+
+    url = f"{rw_api_url.rstrip('/')}/{rw_workspace}/runsessions"
+
+    # ── 1. Convert tasks → runRequests ─────────────────────────────────────
+    tasks: List[dict] = search_response.get("tasks", [])
+    if not tasks:
+        BuiltIn().log("[create_runsession] search_response had no tasks", level="INFO")
+        return {}
+
+    new_struct = "workspaceTask" in tasks[0]
+    runreq_map: Dict[str, Dict[str, Any]] = defaultdict(
+        lambda: {"slxName": None, "taskTitles": [], "fromSearchQuery": source}
+    )
+
+    for t in tasks:
+        if t.get("score", 0) < score_threshold:
+            continue
+
+        if new_struct:
+            ws    = t["workspaceTask"]
+            slx   = ws.get("slxShortName") or ws.get("slxName")
+            title = ws.get("unresolvedTitle") or ws.get("resolvedTitle")
+        else:
+            slx   = t.get("slxShortName") or t.get("slxName")
+            title = t.get("taskName")      or t.get("resolvedTaskName")
+
+        if not slx or not title:
+            continue
+        if not slx.startswith(f"{rw_workspace}--"):
+            slx = f"{rw_workspace}--{slx}"
+
+        rr = runreq_map[slx]
+        rr["slxName"] = slx
+        rr["taskTitles"].append(title)
+
+    run_requests = list(runreq_map.values())
+    if not run_requests:
+        BuiltIn().log("[create_runsession] no tasks above threshold", level="INFO")
+        return {}
+
+    # ── 2. Build payload (persona only at root) ────────────────────────────
+    body: dict = {
+        "generateName": runsession_prefix,
+        "runRequests":  run_requests,
+        "active": True,
+    }
+    if persona_shortname:
+        body["persona_name"] = f"{rw_workspace}--{persona_shortname}"
+    if notes:
+        body["notes"] = notes
+
+    if dry_run:
+        return body
+
+    # ── 3. Auth headers ────────────────────────────────────────────────────
+    sess = requests.Session()
+    if api_token:
+        sess.headers["Authorization"] = f"Bearer {api_token.value}"
+    elif os.getenv("RW_USER_TOKEN"):
+        sess.headers["Authorization"] = f"Bearer {os.environ['RW_USER_TOKEN']}"
+
+    # ── 4. POST ────────────────────────────────────────────────────────────
+    try:
+        resp = sess.post(url, json=body, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException as e:
+        BuiltIn().log(
+            f"[create_runsession] POST failed: "
+            f"{getattr(resp, 'status_code', '')} {getattr(resp, 'text', str(e))}",
+            level="WARN",
+        )
+        return {}
+
 def get_persona_details(
     persona: str,
 ) -> dict:
