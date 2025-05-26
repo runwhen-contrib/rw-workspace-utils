@@ -11,6 +11,7 @@ Library           OperatingSystem
 Library           RW.CLI
 Library           RW.Azure
 Library           RW.Workspace
+Library           RW.RunSession
 Library           Collections
 Library           String
  
@@ -145,7 +146,9 @@ Start RunSession From Azure Monitor Webhook Details
             ...                    slx_scope=${slx_scopes}
             ${tasks_md}    ${total_persona_tasks}=          RW.Workspace.Build Task Report Md
             ...                    search_response=${persona_search}
-            ...                    score_threshold=${run_confidence}
+            # ...                    score_threshold=${run_confidence}
+            ...                    score_threshold=0
+
             RW.Core.Add To Report    \# Tasks meeting confidence ≥${run_confidence}
             RW.Core.Add Pre To Report    ${tasks_md}
 
@@ -157,8 +160,9 @@ Start RunSession From Azure Monitor Webhook Details
                     ${runsession}=    RW.RunSession.Create RunSession from Task Search
                     ...    search_response=${persona_search}
                     ...    persona_shortname=${CURRENT_SESSION_JSON["personaShortName"]}
-                    ...    score_threshold=${run_confidence}
-                    ...    runsession_prefix=Azure-Monitor-Alert-${WEBHOOK_JSON["problemId"]}
+                    # ...    score_threshold=${run_confidence}
+                    ...     score_threshold=0
+                    ...    runsession_prefix=Azure-Monitor-Alert-${alert_rule}
                     ...    notes=${CURRENT_SESSION_JSON["notes"]}
                     ...    source=${CURRENT_SESSION_JSON["source"]}
                     IF    $runsession != {}
