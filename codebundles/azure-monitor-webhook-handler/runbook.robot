@@ -28,9 +28,9 @@ Suite Initialization
     Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
 
     # Local test data
-    #${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
-    #${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
-    #Set Suite Variable    ${WEBHOOK_JSON}
+    # ${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
+    # ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
+    # Set Suite Variable    ${WEBHOOK_JSON}
 
     ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
     ${CURRENT_SESSION_JSON}=    Evaluate    json.loads(r'''${CURRENT_SESSION}''')    json
@@ -99,6 +99,12 @@ Start RunSession From Azure Monitor Webhook Details
         END
         Log To Console    Resource names: ${resource_names}
 
+        # Ensure resource_names is not empty to prevent search issues
+        IF    len(${resource_names}) == 0
+            RW.Core.Add To Report    Warning: No resource names extracted from webhook, using fallback search
+            ${resource_names}=    Create List    health
+        END
+
         # 3) find SLXs that reference any of those names
         ${slx_list}=    RW.Workspace.Get Slxs With Entity Reference    ${resource_names}
         Log    Results: ${slx_list}
@@ -128,6 +134,7 @@ Start RunSession From Azure Monitor Webhook Details
 
             # A scope of a single SLX tends to present search issues. Add all SLXs from the same group if we only have one SLX.
             ${scope_expanded}=    Set Variable    False
+            ${expanded_slx_scopes}=    Set Variable    ${final_slx_scopes}
             IF    len(@{final_slx_scopes}) == 1
                 ${config}=    RW.Workspace.Get Workspace Config
 
@@ -136,9 +143,9 @@ Start RunSession From Azure Monitor Webhook Details
                 ...    slx_name=${final_slx_scopes[0]}
                 @{nearby_slx_list}    Convert To List    ${nearby_slxs}
                 FOR    ${slx}    IN    @{nearby_slx_list}
-                    Append To List    ${final_slx_scopes}    ${slx}
+                    Append To List    ${expanded_slx_scopes}    ${slx}
                 END
-                Add Pre To Report    Expanding scope to include the following SLXs: ${final_slx_scopes}
+                Add Pre To Report    Expanding scope to include the following SLXs: ${expanded_slx_scopes}
                 ${scope_expanded}=    Set Variable    True
             END
 
@@ -148,8 +155,8 @@ Start RunSession From Azure Monitor Webhook Details
                 ...    entity_data=${resource_names}
                 ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
                 ...    confidence_threshold=${run_confidence}
-                ...    slx_scope=${final_slx_scopes}
-                RW.Core.Add To Report    Re-searched with expanded scope: ${final_slx_scopes}
+                ...    slx_scope=${expanded_slx_scopes}
+                RW.Core.Add To Report    Re-searched with expanded scope: ${expanded_slx_scopes}
             END
 
             #  Admin-level discovery (report only)

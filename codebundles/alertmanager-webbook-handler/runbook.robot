@@ -75,6 +75,12 @@ Add Tasks to RunSession from AlertManager Webhook Details
                 Append To List    ${entity_data}    ${value}
             END
 
+            # Ensure entity_data is not empty to prevent search issues
+            IF    len(${entity_data}) == 0
+                RW.Core.Add To Report    Warning: No entity data extracted from commonLabels, using fallback search
+                ${entity_data}=    Create List    health
+            END
+
             # Use improved search strategy
             ${persona_search}    ${search_strategy}    ${final_slx_scopes}    ${search_query}=    RW.Workspace.Perform Improved Task Search
             ...    entity_data=${entity_data}
@@ -87,6 +93,8 @@ Add Tasks to RunSession from AlertManager Webhook Details
             RW.Core.Add To Report    SLX scopes used: ${final_slx_scopes}
 
             # A scope of a single SLX tends to present search issues. Add all SLXs from the same group if we only have one SLX.
+            ${scope_expanded}=    Set Variable    False
+            ${expanded_slx_scopes}=    Set Variable    ${final_slx_scopes}
             IF    len(@{final_slx_scopes}) == 1
                 ${config}=    RW.Workspace.Get Workspace Config
 
@@ -95,9 +103,20 @@ Add Tasks to RunSession from AlertManager Webhook Details
                 ...    slx_name=${final_slx_scopes[0]}
                 @{nearby_slx_list}    Convert To List    ${nearby_slxs}
                 FOR    ${slx}    IN    @{nearby_slx_list}
-                    Append To List    ${final_slx_scopes}    ${slx}
+                    Append To List    ${expanded_slx_scopes}    ${slx}
                 END
-                Add Pre To Report    Expanding scope to include the following SLXs: ${final_slx_scopes}
+                Add Pre To Report    Expanding scope to include the following SLXs: ${expanded_slx_scopes}
+                ${scope_expanded}=    Set Variable    True
+            END
+
+            # If scope was expanded, perform a new search with the expanded scope
+            IF    ${scope_expanded}
+                ${persona_search}    ${search_strategy}    ${final_slx_scopes}    ${search_query}=    RW.Workspace.Perform Improved Task Search
+                ...    entity_data=${entity_data}
+                ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
+                ...    confidence_threshold=${run_confidence}
+                ...    slx_scope=${expanded_slx_scopes}
+                RW.Core.Add To Report    Re-searched with expanded scope: ${expanded_slx_scopes}
             END
 
             # Perform search with Admin permissions - These tasks will never be run

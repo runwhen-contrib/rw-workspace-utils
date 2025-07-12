@@ -699,6 +699,9 @@ def perform_improved_task_search(
     if "--" not in persona:
         persona = f"{ws}--{persona}"
 
+    # Initialize search_response to prevent undefined variable error
+    search_response = {}
+
     # Strategy 1: Search with extracted entity data
     if entity_data:
         entity_query = " ".join(entity_data) + " health"
@@ -776,6 +779,15 @@ def perform_improved_task_search(
             BuiltIn().log(f"[improved_search] Strategy 3 successful: {len(high_quality_tasks)} high-quality tasks found", level="INFO")
             return search_response, "child_resource_tags", combined_scope, "health"
 
-    # If all strategies fail, return the last search response
+    # If all strategies fail, perform a fallback search or return empty response
     BuiltIn().log("[improved_search] All strategies failed to find high-quality results", level="WARN")
+    
+    # Perform a fallback search to ensure we have a valid search_response
+    if not search_response:
+        search_response = perform_task_search_with_persona(
+            query="health",
+            persona=persona,
+            slx_scope=slx_scope
+        )
+    
     return search_response, "fallback", slx_scope or [], "health"
