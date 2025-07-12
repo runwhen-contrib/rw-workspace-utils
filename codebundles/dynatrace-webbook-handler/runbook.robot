@@ -77,6 +77,7 @@ Start RunSession From Dynatrace Webhook Details
             RW.Core.Add To Report    SLX scopes used: ${final_slx_scopes}
 
             # A scope of a single SLX tends to present search issues. Add all SLXs from the same group if we only have one SLX.
+            ${scope_expanded}=    Set Variable    False
             IF    len(@{final_slx_scopes}) == 1
                 ${config}=    RW.Workspace.Get Workspace Config
 
@@ -88,6 +89,17 @@ Start RunSession From Dynatrace Webhook Details
                     Append To List    ${final_slx_scopes}    ${slx}
                 END
                 Add Pre To Report    Expanding scope to include the following SLXs: ${final_slx_scopes}
+                ${scope_expanded}=    Set Variable    True
+            END
+
+            # If scope was expanded, perform a new search with the expanded scope
+            IF    ${scope_expanded}
+                ${persona_search}    ${search_strategy}    ${final_slx_scopes}    ${search_query}=    RW.Workspace.Perform Improved Task Search
+                ...    entity_data=${entity_names}
+                ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
+                ...    confidence_threshold=${run_confidence}
+                ...    slx_scope=${final_slx_scopes}
+                RW.Core.Add To Report    Re-searched with expanded scope: ${final_slx_scopes}
             END
 
             #  Admin-level discovery (report only)
