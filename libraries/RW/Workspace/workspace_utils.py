@@ -673,7 +673,7 @@ def perform_improved_task_search(
     persona: str,
     confidence_threshold: float = 0.7,
     slx_scope: Optional[List[str]] = None,
-) -> Tuple[Dict, str, List[str]]:
+) -> Tuple[Dict, str, List[str], str]:
     """
     Perform an improved three-tier search strategy for webhook handlers:
     
@@ -688,13 +688,13 @@ def perform_improved_task_search(
         slx_scope: Optional SLX scope to limit search
         
     Returns:
-        Tuple of (search_response, search_strategy_used, slx_scopes_used)
+        Tuple of (search_response, search_strategy_used, slx_scopes_used, search_query_used)
     """
     try:
         ws = import_platform_variable("RW_WORKSPACE")
         root = import_platform_variable("RW_WORKSPACE_API_URL")
     except ImportError:
-        return {}, "failed", []
+        return {}, "failed", [], ""
 
     if "--" not in persona:
         persona = f"{ws}--{persona}"
@@ -718,7 +718,7 @@ def perform_improved_task_search(
         
         if high_quality_tasks:
             BuiltIn().log(f"[improved_search] Strategy 1 successful: {len(high_quality_tasks)} high-quality tasks found", level="INFO")
-            return search_response, "entity_data", slx_scope or []
+            return search_response, "entity_data", slx_scope or [], entity_query
 
     # Strategy 2: Search with SLX spec.tag "resource_name"
     BuiltIn().log("[improved_search] Strategy 2: Searching with resource_name tags", level="INFO")
@@ -746,7 +746,7 @@ def perform_improved_task_search(
         
         if high_quality_tasks:
             BuiltIn().log(f"[improved_search] Strategy 2 successful: {len(high_quality_tasks)} high-quality tasks found", level="INFO")
-            return search_response, "resource_name_tags", combined_scope
+            return search_response, "resource_name_tags", combined_scope, "health"
 
     # Strategy 3: Search with "child_resource" tag names
     BuiltIn().log("[improved_search] Strategy 3: Searching with child_resource tags", level="INFO")
@@ -774,8 +774,8 @@ def perform_improved_task_search(
         
         if high_quality_tasks:
             BuiltIn().log(f"[improved_search] Strategy 3 successful: {len(high_quality_tasks)} high-quality tasks found", level="INFO")
-            return search_response, "child_resource_tags", combined_scope
+            return search_response, "child_resource_tags", combined_scope, "health"
 
     # If all strategies fail, return the last search response
     BuiltIn().log("[improved_search] All strategies failed to find high-quality results", level="WARN")
-    return search_response, "fallback", slx_scope or []
+    return search_response, "fallback", slx_scope or [], "health"

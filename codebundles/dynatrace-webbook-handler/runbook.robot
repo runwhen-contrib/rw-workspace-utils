@@ -66,13 +66,14 @@ Start RunSession From Dynatrace Webhook Details
             ${run_confidence}=    Set Variable    ${persona["spec"]["run"]["confidenceThreshold"]}
 
             # Use improved search strategy
-            ${persona_search}    ${search_strategy}    ${final_slx_scopes}=    RW.Workspace.Perform Improved Task Search
+            ${persona_search}    ${search_strategy}    ${final_slx_scopes}    ${search_query}=    RW.Workspace.Perform Improved Task Search
             ...    entity_data=${entity_names}
             ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
             ...    confidence_threshold=${run_confidence}
             ...    slx_scope=${slx_scopes}
 
             RW.Core.Add To Report    Search strategy used: ${search_strategy}
+            RW.Core.Add To Report    Search query used: ${search_query}
             RW.Core.Add To Report    SLX scopes used: ${final_slx_scopes}
 
             # A scope of a single SLX tends to present search issues. Add all SLXs from the same group if we only have one SLX.
