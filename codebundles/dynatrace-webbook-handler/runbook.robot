@@ -85,7 +85,7 @@ Start RunSession From Dynatrace Webhook Details
             # A scope of a single SLX tends to present search issues. Add all SLXs from the same group if we only have one SLX.
             ${scope_expanded}=    Set Variable    False
             ${expanded_slx_scopes}=    Set Variable    ${final_slx_scopes}
-            IF    len(@{final_slx_scopes}) == 1
+            IF    len(${final_slx_scopes}) == 1
                 ${config}=    RW.Workspace.Get Workspace Config
 
                 ${nearby_slxs}=    RW.Workspace.Get Nearby Slxs
