@@ -701,7 +701,7 @@ def perform_improved_task_search(
 
     # Strategy 1: Search with extracted entity data
     if entity_data:
-        entity_query = " ".join(entity_data)
+        entity_query = " ".join(entity_data) + " health"
         BuiltIn().log(f"[improved_search] Strategy 1: Searching with entity data: {entity_query}", level="INFO")
         
         search_response = perform_task_search_with_persona(
