@@ -718,7 +718,10 @@ def perform_improved_task_search(
         
         if high_quality_tasks:
             BuiltIn().log(f"[improved_search] Strategy 1 successful: {len(high_quality_tasks)} high-quality tasks found", level="INFO")
-            return search_response, "entity_data", slx_scope or [], entity_query
+            # Create detailed search string
+            scope_info = f" (scope: {', '.join(slx_scope)})" if slx_scope else ""
+            detailed_query = f'"{entity_query}"{scope_info}'
+            return search_response, "entity_data", slx_scope or [], detailed_query
 
     # Strategy 2: Search with SLX spec.tag "resource_name"
     BuiltIn().log("[improved_search] Strategy 2: Searching with resource_name tags", level="INFO")
@@ -746,7 +749,10 @@ def perform_improved_task_search(
         
         if high_quality_tasks:
             BuiltIn().log(f"[improved_search] Strategy 2 successful: {len(high_quality_tasks)} high-quality tasks found", level="INFO")
-            return search_response, "resource_name_tags", combined_scope, "health"
+            # Create detailed search string
+            scope_info = f" (scope: {', '.join(combined_scope)})" if combined_scope else ""
+            detailed_query = f'"health"{scope_info}'
+            return search_response, "resource_name_tags", combined_scope, detailed_query
 
     # Strategy 3: Search with "child_resource" tag names
     BuiltIn().log("[improved_search] Strategy 3: Searching with child_resource tags", level="INFO")
@@ -774,8 +780,13 @@ def perform_improved_task_search(
         
         if high_quality_tasks:
             BuiltIn().log(f"[improved_search] Strategy 3 successful: {len(high_quality_tasks)} high-quality tasks found", level="INFO")
-            return search_response, "child_resource_tags", combined_scope, "health"
+            # Create detailed search string
+            scope_info = f" (scope: {', '.join(combined_scope)})" if combined_scope else ""
+            detailed_query = f'"health"{scope_info}'
+            return search_response, "child_resource_tags", combined_scope, detailed_query
 
     # If all strategies fail, return the last search response
     BuiltIn().log("[improved_search] All strategies failed to find high-quality results", level="WARN")
-    return search_response, "fallback", slx_scope or [], "health"
+    scope_info = f" (scope: {', '.join(slx_scope)})" if slx_scope else ""
+    detailed_query = f'"health"{scope_info}'
+    return search_response, "fallback", slx_scope or [], detailed_query
