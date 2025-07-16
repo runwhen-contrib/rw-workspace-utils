@@ -69,9 +69,9 @@ def _page_through_slxs(start_url: str, session: requests.Session) -> List[Dict]:
     url = start_url
     collected: List[Dict] = []
     max_retries = 3
-    retry_delay = 2
 
     while url:
+        retry_delay = 2  # Reset retry_delay for each new URL
         for attempt in range(max_retries):
             try:
                 resp = session.get(url, timeout=30)  # Increased timeout from 10 to 30 seconds
