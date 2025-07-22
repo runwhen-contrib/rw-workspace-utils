@@ -248,7 +248,7 @@ def create_runsession_from_task_search(
         BuiltIn().log(f"[create_runsession] env var missing: {e}", level="WARN")
         return {}
 
-    url = f"{rw_api_url.rstrip('/')}/{rw_workspace}/runsessions"
+    url = f"{rw_api_url.rstrip('/')}/workspaces/{rw_workspace}/runsessions"
 
     # ── 1. Convert tasks → runRequests ─────────────────────────────────────
     tasks: List[dict] = search_response.get("tasks", [])
