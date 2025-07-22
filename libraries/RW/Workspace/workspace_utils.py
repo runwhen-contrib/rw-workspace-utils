@@ -16,6 +16,7 @@ import requests
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, Optional
 from robot.libraries.BuiltIn import BuiltIn
+from robot.api.deco import keyword
 
 from RW import platform                      
 from RW.Core import Core                     
@@ -164,10 +165,14 @@ def get_slxs_with_tag(tag_list: List[Any]) -> List[Dict]:
     return matches
 
 
+@keyword("Get Slxs With Entity Reference")
 def get_slxs_with_entity_reference(entity_refs: List[str]) -> List[Dict]:
     """
-    Return all SLXs that reference (alias, tag, configProvided, additionalContext)
-    any identifier in *entity_refs* (case-insensitive substring match).
+    Return SLXs that reference entities in *entity_refs* using a tiered matching strategy:
+    1. First try to match specific tag types (resource_name, child_resource)
+    2. Then try broader matches but limit scope to prevent API overload
+    
+    This function prioritizes precision over recall to keep search scopes manageable.
     """
     try:
         ws = import_platform_variable("RW_WORKSPACE")
@@ -193,27 +198,121 @@ def get_slxs_with_entity_reference(entity_refs: List[str]) -> List[Dict]:
         return []
 
     terms = {t.lower() for t in entity_refs if isinstance(t, str) and t}
-    hits: List[Dict] = []
+    if not terms:
+        return []
 
+    # Tier 1: High-priority matches (specific tag types)
+    priority_hits: List[Dict] = []
+    priority_tag_names = {"resource_name", "child_resource", "entity_name", "target_resource"}
+    
     for slx in all_slxs:
+        spec = slx.get("spec", {})
+        tags = spec.get("tags", [])
+        
+        # Check for priority tag matches
+        for tag in tags:
+            tag_name = tag.get("name", "").lower()
+            tag_value = tag.get("value", "").lower()
+            
+            if tag_name in priority_tag_names and any(term in tag_value for term in terms):
+                priority_hits.append(slx)
+                break
+    
+    # If we found priority matches, return them (limit to prevent scope explosion)
+    if priority_hits:
+        BuiltIn().log(f"Found {len(priority_hits)} SLXs with priority tag matches", level="INFO")
+        return priority_hits[:50]  # Limit to 50 to prevent scope explosion
+    
+    # Tier 2: Broader matches but with strict limits
+    broader_hits: List[Dict] = []
+    max_broader_matches = 20  # Strict limit to prevent API overload
+    
+    for slx in all_slxs:
+        if len(broader_hits) >= max_broader_matches:
+            break
+            
         spec = slx.get("spec", {})
         corpus = [spec.get("alias", "")]
 
+        # Only check tags, skip configProvided and additionalContext for broader search
         for t in spec.get("tags", []):
             n, v = t.get("name", ""), t.get("value", "")
             corpus.extend([n, v, f"{n}:{v}"])
 
-        for cp in spec.get("configProvided", []):
-            n, v = cp.get("name", ""), cp.get("value", "")
-            corpus.extend([n, v, f"{n}:{v}"])
-
-        for k, v in spec.get("additionalContext", {}).items():
-            corpus.extend([k, str(v), f"{k}:{v}"])
-
         joined = " ".join(corpus).lower()
         if any(term in joined for term in terms):
-            hits.append(slx)
+            broader_hits.append(slx)
+    
+    if broader_hits:
+        BuiltIn().log(f"Found {len(broader_hits)} SLXs with broader matches (limited to {max_broader_matches})", level="INFO")
+        return broader_hits
+    
+    # No matches found
+    BuiltIn().log("No SLXs found matching entity references", level="INFO")
+    return []
 
+
+@keyword("Get Slxs With Targeted Entity Reference")
+def get_slxs_with_targeted_entity_reference(entity_refs: List[str], tag_types: List[str] = None) -> List[Dict]:
+    """
+    Return SLXs that reference entities in *entity_refs* using specific tag types.
+    
+    Args:
+        entity_refs: List of entity names/identifiers to search for
+        tag_types: List of specific tag names to match against (e.g., ["resource_name", "child_resource"])
+                   If None, defaults to ["resource_name", "child_resource", "entity_name"]
+    
+    Returns:
+        List of SLXs that have matching tags of the specified types
+    """
+    if tag_types is None:
+        tag_types = ["resource_name", "child_resource", "entity_name"]
+    
+    try:
+        ws = import_platform_variable("RW_WORKSPACE")
+        root = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError:
+        return []
+
+    token = os.getenv("RW_USER_TOKEN")
+    if token:
+        sess = requests.Session()
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
+    else:
+        sess = platform.get_authenticated_session()
+
+    start_url = f"{root}/{ws}/slxs?limit=500"
+    try:
+        all_slxs = _page_through_slxs(start_url, sess)
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        warning_log("Paging SLXs failed", str(e))
+        return []
+
+    terms = {t.lower() for t in entity_refs if isinstance(t, str) and t}
+    tag_types_set = {t.lower() for t in tag_types}
+    
+    if not terms:
+        return []
+
+    hits: List[Dict] = []
+    
+    for slx in all_slxs:
+        spec = slx.get("spec", {})
+        tags = spec.get("tags", [])
+        
+        # Check for matches in specified tag types
+        for tag in tags:
+            tag_name = tag.get("name", "").lower()
+            tag_value = tag.get("value", "").lower()
+            
+            if tag_name in tag_types_set and any(term in tag_value for term in terms):
+                hits.append(slx)
+                break
+    
+    BuiltIn().log(f"Found {len(hits)} SLXs with targeted tag matches for types: {tag_types}", level="INFO")
     return hits
 
 
