@@ -105,8 +105,8 @@ Start RunSession From Azure Monitor Webhook Details
             ${resource_names}=    Create List    health
         END
 
-        # 3) find SLXs that reference any of those names
-        ${slx_list}=    RW.Workspace.Get Slxs With Entity Reference    ${resource_names}
+        # 3) find SLXs that reference any of those names using targeted search for Azure resources
+        ${slx_list}=    RW.Workspace.Get Slxs With Targeted Entity Reference    ${resource_names}    ["resource_name", "child_resource"]
         Log    Results: ${slx_list}
         IF    len(${slx_list}) == 0
             RW.Core.Add To Report    No SLX matched impacted entities – stopping handler.
@@ -183,8 +183,7 @@ Start RunSession From Azure Monitor Webhook Details
                     ${runsession}=    RW.RunSession.Create RunSession from Task Search
                     ...    search_response=${persona_search}
                     ...    persona_shortname=${CURRENT_SESSION_JSON["personaShortName"]}
-                    # ...    score_threshold=${run_confidence}
-                    ...     score_threshold=0
+                    ...    score_threshold=${run_confidence}
                     ...    runsession_prefix=Azure-Monitor-Alert-${alert_rule}
                     ...    notes=${CURRENT_SESSION_JSON["notes"]}
                     ...    source=${CURRENT_SESSION_JSON["source"]}

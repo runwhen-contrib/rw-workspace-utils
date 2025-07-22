@@ -56,8 +56,8 @@ Start RunSession From Dynatrace Webhook Details
             ${entity_names}=    Create List    health
         END
 
-        # 2) Resolve SLXs
-        ${slx_list}=    RW.Workspace.Get Slxs With Entity Reference    ${entity_names}
+        # 2) Resolve SLXs using targeted search for Dynatrace entities
+        ${slx_list}=    RW.Workspace.Get Slxs With Targeted Entity Reference    ${entity_names}    ["entity_name", "resource_name"]
         IF    len(${slx_list}) == 0
             RW.Core.Add To Report    No SLX matched impacted entities – stopping handler.
         ELSE

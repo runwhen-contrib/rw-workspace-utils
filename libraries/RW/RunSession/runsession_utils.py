@@ -302,15 +302,20 @@ def create_runsession_from_task_search(
         return body
 
     # ── 3. Auth headers ────────────────────────────────────────────────────
-    sess = requests.Session()
     if api_token:
+        sess = requests.Session()
         sess.headers["Authorization"] = f"Bearer {api_token.value}"
     elif os.getenv("RW_USER_TOKEN"):
+        sess = requests.Session()
         sess.headers["Authorization"] = f"Bearer {os.environ['RW_USER_TOKEN']}"
+    else:
+        # inside a runbook/runtime – session already carries auth headers
+        sess = platform.get_authenticated_session()
 
     # ── 4. POST ────────────────────────────────────────────────────────────
+    headers = {"Content-Type": "application/json"}
     try:
-        resp = sess.post(url, json=body, timeout=30)  # Increased timeout from 10 to 30 seconds
+        resp = sess.post(url, json=body, headers=headers, timeout=30)  # Increased timeout from 10 to 30 seconds
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
