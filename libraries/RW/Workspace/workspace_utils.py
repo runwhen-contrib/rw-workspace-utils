@@ -656,7 +656,12 @@ def get_workspace_slxs(
     if workspace_path.startswith('workspaces/'):
         workspace_path = workspace_path[len('workspaces/'):]
     
-    url = f"{rw_api_url}/workspaces/{workspace_path}/slxs?limit=500"
+    # Handle case where rw_api_url might already include "/workspaces" suffix
+    base_url = rw_api_url.rstrip('/')
+    if base_url.endswith('/workspaces'):
+        url = f"{base_url}/{workspace_path}/slxs?limit=500"
+    else:
+        url = f"{base_url}/workspaces/{workspace_path}/slxs?limit=500"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_token.value}",

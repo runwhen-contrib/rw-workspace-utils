@@ -30,7 +30,12 @@ def get_runsession_url(rw_runsession=None):
         BuiltIn().log(f"Failure getting required variables", level='WARN')
         return None
 
-    runsession_url = f"{rw_workspace_app_url}/map/{rw_workspace}?selectedRunSessions={rw_runsession}"
+    # Handle case where rw_workspace might already include "workspaces/" prefix
+    workspace_path = rw_workspace.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    runsession_url = f"{rw_workspace_app_url}/map/{workspace_path}?selectedRunSessions={rw_runsession}"
     return runsession_url
 
 def get_runsession_source(payload: dict) -> str:
@@ -253,7 +258,12 @@ def create_runsession_from_task_search(
     if workspace_path.startswith('workspaces/'):
         workspace_path = workspace_path[len('workspaces/'):]
     
-    url = f"{rw_api_url.rstrip('/')}/workspaces/{workspace_path}/runsessions"
+    # Handle case where rw_api_url might already include "/workspaces" suffix
+    base_url = rw_api_url.rstrip('/')
+    if base_url.endswith('/workspaces'):
+        url = f"{base_url}/{workspace_path}/runsessions"
+    else:
+        url = f"{base_url}/workspaces/{workspace_path}/runsessions"
 
     # ── 1. Convert tasks → runRequests ─────────────────────────────────────
     tasks: List[dict] = search_response.get("tasks", [])
@@ -280,8 +290,8 @@ def create_runsession_from_task_search(
 
         if not slx or not title:
             continue
-        if not slx.startswith(f"{rw_workspace}--"):
-            slx = f"{rw_workspace}--{slx}"
+        if not slx.startswith(f"{workspace_path}--"):
+            slx = f"{workspace_path}--{slx}"
 
         rr = runreq_map[slx]
         rr["slxName"] = slx
@@ -299,7 +309,7 @@ def create_runsession_from_task_search(
         "active": True,
     }
     if persona_shortname:
-        body["persona_name"] = f"{rw_workspace}--{persona_shortname}"
+        body["persona_name"] = f"{workspace_path}--{persona_shortname}"
     if notes:
         body["notes"] = notes
 
@@ -353,7 +363,12 @@ def get_persona_details(
     if workspace_path.startswith('workspaces/'):
         workspace_path = workspace_path[len('workspaces/'):]
         
-    url = f"{rw_workspace_api_url}/{workspace_path}/personas/{persona}"
+    # Handle case where rw_workspace_api_url might already include "/workspaces" suffix
+    base_url = rw_workspace_api_url.rstrip('/')
+    if base_url.endswith('/workspaces'):
+        url = f"{base_url}/{workspace_path}/personas/{persona}"
+    else:
+        url = f"{base_url}/workspaces/{workspace_path}/personas/{persona}"
 
     user_token = os.getenv("RW_USER_TOKEN")
     if user_token:
@@ -440,8 +455,8 @@ def add_tasks_to_runsession_from_search(
         if not slx or not title:
             continue
 
-        if not slx.startswith(f"{rw_workspace}--"):
-            slx = f"{rw_workspace}--{slx}"
+        if not slx.startswith(f"{workspace_path}--"):
+            slx = f"{workspace_path}--{slx}"
 
         task_pairs.append((slx, title))
 
@@ -472,7 +487,11 @@ def add_tasks_to_runsession_from_search(
     if workspace_path.startswith('workspaces/'):
         workspace_path = workspace_path[len('workspaces/'):]
         
-    url = f"{base}/{workspace_path}/runsessions/{runsession_id}"
+    # Handle case where rw_api_url might already include "/workspaces" suffix
+    if base.endswith('/workspaces'):
+        url = f"{base}/{workspace_path}/runsessions/{runsession_id}"
+    else:
+        url = f"{base}/workspaces/{workspace_path}/runsessions/{runsession_id}"
 
     # ── 3a. Choose auth method ------------------------------------------------
     if api_token is not None:
