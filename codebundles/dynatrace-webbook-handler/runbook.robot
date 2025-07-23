@@ -162,7 +162,7 @@ Start RunSession From Dynatrace Webhook Details
                         ...    severity=2
                         ...    expected=RunSession should be created successfully
                         ...    actual=RunSession was not created properly
-                        ...    title=Could create RunSession from `${CURRENT_SESSION_JSON["source"]}`
+                        ...    title=RunSession creation failed from `${CURRENT_SESSION_JSON["source"]}`
                         ...    reproduce_hint=Try to create new RunSession
                         ...    details=See debug logs or backend response body.
                         ...    next_steps=Inspect runrequest logs or contact RunWhen support.

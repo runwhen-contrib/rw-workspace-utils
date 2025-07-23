@@ -248,7 +248,12 @@ def create_runsession_from_task_search(
         BuiltIn().log(f"[create_runsession] env var missing: {e}", level="WARN")
         return {}
 
-    url = f"{rw_api_url.rstrip('/')}/workspaces/{rw_workspace}/runsessions"
+    # Handle case where rw_workspace might already include "workspaces/" prefix
+    workspace_path = rw_workspace.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+    
+    url = f"{rw_api_url.rstrip('/')}/workspaces/{workspace_path}/runsessions"
 
     # ── 1. Convert tasks → runRequests ─────────────────────────────────────
     tasks: List[dict] = search_response.get("tasks", [])
@@ -343,7 +348,12 @@ def get_persona_details(
         BuiltIn().log(f"Missing required platform variables: {e}", level="WARN")
         return {}
 
-    url = f"{rw_workspace_api_url}/{rw_workspace}/personas/{persona}"
+    # Handle case where rw_workspace might already include "workspaces/" prefix
+    workspace_path = rw_workspace.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    url = f"{rw_workspace_api_url}/{workspace_path}/personas/{persona}"
 
     user_token = os.getenv("RW_USER_TOKEN")
     if user_token:
@@ -457,7 +467,12 @@ def add_tasks_to_runsession_from_search(
     base = rw_api_url.rstrip("/")                #  ➜ “…/api/v3”  or “…/api/v3/workspaces”
     if not base.endswith("/workspaces"):
         base += "/workspaces" 
-    url = f"{base}/{rw_workspace}/runsessions/{runsession_id}"
+    # Handle case where rw_workspace might already include "workspaces/" prefix
+    workspace_path = rw_workspace.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    url = f"{base}/{workspace_path}/runsessions/{runsession_id}"
 
     # ── 3a. Choose auth method ------------------------------------------------
     if api_token is not None:

@@ -154,7 +154,12 @@ def get_slxs_with_tag(tag_list: List[Any]) -> List[Dict]:
     else:
         sess = platform.get_authenticated_session()
 
-    start_url = f"{root}/{ws}/slxs?limit=500"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    start_url = f"{root}/{workspace_path}/slxs?limit=500"
     try:
         all_slxs = _page_through_slxs(start_url, sess)
     except (requests.RequestException, json.JSONDecodeError) as e:
@@ -199,7 +204,12 @@ def get_slxs_with_entity_reference(entity_refs: List[str]) -> List[Dict]:
     else:
         sess = platform.get_authenticated_session()
 
-    start_url = f"{root}/{ws}/slxs?limit=500"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    start_url = f"{root}/{workspace_path}/slxs?limit=500"
     try:
         all_slxs = _page_through_slxs(start_url, sess)
     except (requests.RequestException, json.JSONDecodeError) as e:
@@ -293,7 +303,12 @@ def get_slxs_with_targeted_entity_reference(entity_refs: List[str], tag_types: L
     else:
         sess = platform.get_authenticated_session()
 
-    start_url = f"{root}/{ws}/slxs?limit=500"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    start_url = f"{root}/{workspace_path}/slxs?limit=500"
     try:
         all_slxs = _page_through_slxs(start_url, sess)
     except (requests.RequestException, json.JSONDecodeError) as e:
@@ -344,7 +359,12 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
     else:
         sess = platform.get_authenticated_session()
 
-    rb_url = f"{root}/{ws}/slxs/{slx}/runbook"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    rb_url = f"{root}/{workspace_path}/slxs/{slx}/runbook"
     try:
         rb = sess.get(rb_url, timeout=30)  # Increased timeout from 10 to 30 seconds
         rb.raise_for_status()
@@ -355,11 +375,11 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
 
     patch_body = {
         "runRequests": [{
-            "slxName": f"{ws}--{slx}",
+            "slxName": f"{workspace_path}--{slx}",
             "taskTitles": tasks
         }]
     }
-    rs_url = f"{root}/{ws}/runsessions/{runsess}"
+    rs_url = f"{root}/{workspace_path}/runsessions/{runsess}"
     try:
         rsp = sess.patch(rs_url, json=patch_body, timeout=30)  # Increased timeout from 10 to 30 seconds
         rsp.raise_for_status()
@@ -396,7 +416,12 @@ def import_runsession_details(runsession_id: Optional[str] = None) -> Optional[s
         BuiltIn().log("Missing required vars for import_runsession_details", level="WARN")
         return None
 
-    url = f"{root}/{ws}/runsessions/{runsession_id}"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    url = f"{root}/{workspace_path}/runsessions/{runsession_id}"
     BuiltIn().log(f"Fetching RunSession: {url}", level="INFO")
 
     token = os.getenv("RW_USER_TOKEN")
@@ -429,7 +454,12 @@ def import_memo_variable(key: str) -> Optional[str]:
         BuiltIn().log("Missing vars for import_memo_variable", level="WARN")
         return None
 
-    url = f"{root}/{ws}/runsessions/{runsess}"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    url = f"{root}/{workspace_path}/runsessions/{runsess}"
     BuiltIn().log(f"Fetching memos: {url}", level="INFO")
     
     token = os.getenv("RW_USER_TOKEN")
@@ -488,7 +518,12 @@ def import_related_runsession_details(
         BuiltIn().log(f"Missing vars: {e}", level="WARN")
         return None
 
-    endpoint = f"{root}/{ws}/runsessions/{runsession_id}"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    endpoint = f"{root}/{workspace_path}/runsessions/{runsession_id}"
     BuiltIn().log(f"Polling: {endpoint}", level="INFO")
 
     # choose session
@@ -551,7 +586,12 @@ def get_workspace_config() -> list | dict:
     except ImportError:
         return {}          # running outside expected context
 
-    url = f"{root.rstrip('/')}/{ws}/branches/main/workspace.yaml?format=json"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+    
+    url = f"{root.rstrip('/')}/{workspace_path}/branches/main/workspace.yaml?format=json"
 
     # ── 1. Build an authenticated session ──────────────────────────────────
     user_token = os.getenv("RW_USER_TOKEN")
@@ -611,7 +651,12 @@ def get_workspace_slxs(
     """
     Get all SLXs in a workspace (paginated) and return combined JSON string.
     """
-    url = f"{rw_api_url}/workspaces/{rw_workspace}/slxs?limit=500"
+    # Handle case where rw_workspace might already include "workspaces/" prefix
+    workspace_path = rw_workspace.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+    
+    url = f"{rw_api_url}/workspaces/{workspace_path}/slxs?limit=500"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_token.value}",
@@ -712,10 +757,15 @@ def perform_task_search_with_persona(
     except ImportError:
         return {}
 
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
     if "--" not in persona:
-        persona = f"{ws}--{persona}"
+        persona = f"{workspace_path}--{persona}"
 
-    url = f"{root}/{ws}/task-search"
+    url = f"{root}/{workspace_path}/task-search"
     body = {"query": [query], "scope": slx_scope, "persona": persona}
 
     token = os.getenv("RW_USER_TOKEN")
@@ -743,7 +793,12 @@ def perform_task_search(
     except ImportError:
         return {}
 
-    url = f"{root}/{ws}/task-search"
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+        
+    url = f"{root}/{workspace_path}/task-search"
     body = {"query": [query], "scope": slx_scope}
 
     token = os.getenv("RW_USER_TOKEN")
