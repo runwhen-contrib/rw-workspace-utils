@@ -86,17 +86,29 @@ Start RunSession From Dynatrace Webhook Details
             ${scope_expanded}=    Set Variable    False
             ${expanded_slx_scopes}=    Set Variable    ${final_slx_scopes}
             IF    len(${final_slx_scopes}) == 1
-                ${config}=    RW.Workspace.Get Workspace Config
-
-                ${nearby_slxs}=    RW.Workspace.Get Nearby Slxs
-                ...    workspace_config=${config}
-                ...    slx_name=${final_slx_scopes[0]}
-                @{nearby_slx_list}    Convert To List    ${nearby_slxs}
-                FOR    ${slx}    IN    @{nearby_slx_list}
-                    Append To List    ${expanded_slx_scopes}    ${slx}
+                TRY
+                    ${config}=    RW.Workspace.Get Workspace Config
+                    # Check if config contains SLX data (empty dict means API failure or no SLXs)
+                    IF    len($config) > 0
+                        ${nearby_slxs}=    RW.Workspace.Get Nearby Slxs
+                        ...    workspace_config=${config}
+                        ...    slx_name=${final_slx_scopes[0]}
+                        @{nearby_slx_list}    Convert To List    ${nearby_slxs}
+                        IF    len(${nearby_slx_list}) > 0
+                            FOR    ${slx}    IN    @{nearby_slx_list}
+                                Append To List    ${expanded_slx_scopes}    ${slx}
+                            END
+                            RW.Core.Add Pre To Report    Expanding scope to include the following SLXs: ${expanded_slx_scopes}
+                            ${scope_expanded}=    Set Variable    True
+                        ELSE
+                            RW.Core.Add To Report    No nearby SLXs found for scope expansion
+                        END
+                    ELSE
+                        RW.Core.Add To Report    Could not expand SLX scope - workspace config unavailable
+                    END
+                EXCEPT    AS    ${error}
+                    RW.Core.Add To Report    Could not expand SLX scope due to error: ${error}
                 END
-                Add Pre To Report    Expanding scope to include the following SLXs: ${expanded_slx_scopes}
-                ${scope_expanded}=    Set Variable    True
             END
 
             # If scope was expanded, perform a new search with the expanded scope

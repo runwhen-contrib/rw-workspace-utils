@@ -144,7 +144,16 @@ def get_slxs_with_tag(tag_list: List[Any]) -> List[Dict]:
     if not wanted:
         return []
 
-    sess = platform.get_authenticated_session()
+    token = os.getenv("RW_USER_TOKEN")
+    if token:
+        sess = requests.Session()
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
+    else:
+        sess = platform.get_authenticated_session()
+
     start_url = f"{root}/{ws}/slxs?limit=500"
     try:
         all_slxs = _page_through_slxs(start_url, sess)
@@ -325,7 +334,15 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
     except ImportError:
         return None
 
-    sess = platform.get_authenticated_session()
+    token = os.getenv("RW_USER_TOKEN")
+    if token:
+        sess = requests.Session()
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
+    else:
+        sess = platform.get_authenticated_session()
 
     rb_url = f"{root}/{ws}/slxs/{slx}/runbook"
     try:
@@ -414,7 +431,16 @@ def import_memo_variable(key: str) -> Optional[str]:
 
     url = f"{root}/{ws}/runsessions/{runsess}"
     BuiltIn().log(f"Fetching memos: {url}", level="INFO")
-    sess = platform.get_authenticated_session()
+    
+    token = os.getenv("RW_USER_TOKEN")
+    if token:
+        sess = requests.Session()
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
+    else:
+        sess = platform.get_authenticated_session()
 
     try:
         rsp = sess.get(url, timeout=30, verify=platform.REQUEST_VERIFY)
@@ -516,24 +542,26 @@ def get_workspace_config() -> list | dict:
       • during local / unit testing – where you may export RW_USER_TOKEN to
         override the auth header.
 
-    Falls back to an empty list on any failure.
+    Falls back to an empty dictionary on any failure.
     """
     # ── 0. Resolve workspace + API root ─────────────────────────────────────
     try:
         ws   = import_platform_variable("RW_WORKSPACE")
         root = import_platform_variable("RW_WORKSPACE_API_URL")
     except ImportError:
-        return []          # running outside expected context
+        return {}          # running outside expected context
 
     url = f"{root.rstrip('/')}/{ws}/branches/main/workspace.yaml?format=json"
 
     # ── 1. Build an authenticated session ──────────────────────────────────
-    sess = platform.get_authenticated_session()      # carries default auth
-
     user_token = os.getenv("RW_USER_TOKEN")
     if user_token:
         # Local test override
+        sess = requests.Session()
         sess.headers.update({"Authorization": f"Bearer {user_token}"})
+    else:
+        # inside a runbook/runtime – session already carries auth headers
+        sess = platform.get_authenticated_session()
 
     sess.headers.setdefault("Content-Type", "application/json")
 
@@ -542,14 +570,14 @@ def get_workspace_config() -> list | dict:
         resp = sess.get(url, timeout=30)  # Increased timeout from 10 to 30 seconds
         resp.raise_for_status()
         # API shape: { "asJson": { …workspace.yaml parsed… } }
-        return resp.json().get("asJson", [])
+        return resp.json().get("asJson", {})
     except (requests.RequestException, json.JSONDecodeError) as e:
         BuiltIn().log(
             f"[get_workspace_config] Failed fetching workspace.yaml for '{ws}': {e}",
             level="WARN",
         )
         platform_logger.exception(e)
-        return []
+        return {}
 
 
 def get_nearby_slxs(workspace_config: dict, slx_name: str) -> list:
