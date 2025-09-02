@@ -27,14 +27,11 @@ def get_runsession_url(rw_runsession=None):
         rw_workspace = os.getenv("RW_WORKSPACE")
         rw_workspace_app_url = os.getenv("RW_FRONTEND_URL")
     except ImportError:
-        BuiltIn().log(f"Failure getting required variables", level="WARN")
+        BuiltIn().log(f"Failure getting required variables", level='WARN')
         return None
 
-    runsession_url = (
-        f"{rw_workspace_app_url}/map/{rw_workspace}?selectedRunSessions={rw_runsession}"
-    )
+    runsession_url = f"{rw_workspace_app_url}/map/{rw_workspace}?selectedRunSessions={rw_runsession}"
     return runsession_url
-
 
 def get_runsession_source(payload: dict) -> str:
     """
@@ -43,7 +40,7 @@ def get_runsession_source(payload: dict) -> str:
       2) Otherwise, look at the first (earliest) runRequest by 'created' time, and
          check in order:
              fromSearchQuery, fromIssue, fromSliAlert, fromAlert
-         Return the name of whichever key is non-null.
+         Return the name of whichever key is non-null. 
       3) If nothing is found, return "Unknown".
     """
 
@@ -61,9 +58,7 @@ def get_runsession_source(payload: dict) -> str:
         # '2025-02-11T08:49:06.773513Z' -> parse with replacement of 'Z' to '+00:00'
         return datetime.fromisoformat(dt.replace("Z", "+00:00"))
 
-    sorted_requests = sorted(
-        run_requests, key=lambda rr: _parse_iso_datetime(rr["created"])
-    )
+    sorted_requests = sorted(run_requests, key=lambda rr: _parse_iso_datetime(rr["created"]))
     earliest_rr = sorted_requests[0]
 
     # 3) Check the relevant fields in the earliest runRequest
@@ -85,56 +80,52 @@ def get_runsession_source(payload: dict) -> str:
 
 def count_open_issues(data: str):
     """Return a count of issues that have not been closed."""
-    open_issues = 0
-    runsession = json.loads(data)
+    open_issues = 0 
+    runsession = json.loads(data) 
     for run_request in runsession.get("runRequests", []):
-        for issue in run_request.get("issues", []):
+        for issue in run_request.get("issues", []): 
             if not issue["closed"]:
-                open_issues += 1
-    return open_issues
-
+                open_issues+=1
+    return(open_issues)
 
 def get_open_issues(data: str):
     """Return a count of issues that have not been closed."""
     open_issue_list = []
-    runsession = json.loads(data)
+    runsession = json.loads(data) 
     for run_request in runsession.get("runRequests", []):
-        for issue in run_request.get("issues", []):
+        for issue in run_request.get("issues", []): 
             if not issue["closed"]:
                 open_issue_list.append(issue)
     return open_issue_list
 
-
 def generate_open_issue_markdown_table(data_list):
     """Generates a markdown report sorted by severity."""
     severity_mapping = {1: "🔥 Critical", 2: "🔴 High", 3: "⚠️ Medium", 4: "ℹ️ Low"}
-
+    
     # Sort data by severity (ascending order)
     sorted_data = sorted(data_list, key=lambda x: x.get("severity", 4))
-
+    
     markdown_output = "-----\n"
     for data in sorted_data:
         severity = severity_mapping.get(data.get("severity", 4), "Unknown")
         title = data.get("title", "N/A")
         next_steps = data.get("nextSteps", "N/A").strip()
         details = data.get("details", "N/A")
-
+        
         markdown_output += f"#### {title}\n\n- **Severity:** {severity}\n\n- **Next Steps:**\n{next_steps}\n\n"
         markdown_output += f"- **Details:**\n```json\n- {details}\n```\n\n"
-
+    
     return markdown_output
-
 
 def get_open_issues(data: str):
     """Return a count of issues that have not been closed."""
     open_issue_list = []
-    runsession = json.loads(data)
+    runsession = json.loads(data) 
     for run_request in runsession.get("runRequests", []):
-        for issue in run_request.get("issues", []):
+        for issue in run_request.get("issues", []): 
             if not issue["closed"]:
                 open_issue_list.append(issue)
     return open_issue_list
-
 
 def summarize_runsession_users(data: str, output_format: str = "text") -> str:
     """
@@ -202,38 +193,35 @@ def summarize_runsession_users(data: str, output_format: str = "text") -> str:
             text_lines.append(f"  - {assistant}")
         return "\n".join(text_lines)
 
-
 def extract_issue_keywords(data: str):
-    runsession = json.loads(data)
+    runsession = json.loads(data) 
     issue_keywords = set()
-
+    
     for request in runsession.get("runRequests", []):
         issues = request.get("issues", [])
-
+        
         for issue in issues:
             if not issue.get("closed", False):
-                matches = re.findall(r"`(.*?)`", issue.get("title", ""))
+                matches = re.findall(r'`(.*?)`', issue.get("title", ""))
                 issue_keywords.update(matches)
-
+    
     return list(issue_keywords)
 
-
 def get_most_referenced_resource(data: str):
-    runsession = json.loads(data)
-
+    runsession = json.loads(data) 
+    
     keyword_counter = Counter()
-
+    
     for request in runsession.get("runRequests", []):
         issues = request.get("issues", [])
-
+        
         for issue in issues:
-            matches = re.findall(r"`(.*?)`", issue.get("title", ""))
+            matches = re.findall(r'`(.*?)`', issue.get("title", ""))
             keyword_counter.update(matches)
-
+    
     most_common_resource = keyword_counter.most_common(1)
-
+    
     return most_common_resource[0][0] if most_common_resource else "No keywords found"
-
 
 def create_runsession_from_task_search(
     *,
@@ -247,7 +235,6 @@ def create_runsession_from_task_search(
     rw_api_url: str | None = None,
     rw_workspace: str | None = None,
     dry_run: bool = False,
-    dedupe: bool = True,
     webhook_data: dict = {},
     alert_source: str = "",
 ) -> dict | str:
@@ -281,12 +268,12 @@ def create_runsession_from_task_search(
             continue
 
         if new_struct:
-            ws = t["workspaceTask"]
-            slx = ws.get("slxShortName") or ws.get("slxName")
+            ws    = t["workspaceTask"]
+            slx   = ws.get("slxShortName") or ws.get("slxName")
             title = ws.get("unresolvedTitle") or ws.get("resolvedTitle")
         else:
-            slx = t.get("slxShortName") or t.get("slxName")
-            title = t.get("taskName") or t.get("resolvedTaskName")
+            slx   = t.get("slxShortName") or t.get("slxName")
+            title = t.get("taskName")      or t.get("resolvedTaskName")
 
         if not slx or not title:
             continue
@@ -305,16 +292,18 @@ def create_runsession_from_task_search(
     # ── 2. Build payload (persona only at root) ────────────────────────────
     body: dict = {
         "generateName": runsession_prefix,
-        "runRequests": run_requests,
+        "runRequests":  run_requests,
         "active": True,
     }
+    if persona_shortname:
+        body["persona_name"] = f"{rw_workspace}--{persona_shortname}"
+    if notes:
+        body["notes"] = notes
 
-    # Process webhook data if present
-    BuiltIn().log("----------------Abid i am here!!!!", level="WARN")
+    if dry_run:
+        return body
+
     if alert_source == "Azure Monitor" and webhook_data:
-        BuiltIn().log(f"------------- webhook_data {webhook_data}", level="WARN")
-        # Store original webhook data
-
         # Extract and structure external alert data
         alert_data = webhook_data.get("data", {})
         essentials = alert_data.get("essentials", {})
@@ -333,14 +322,6 @@ def create_runsession_from_task_search(
             "ttl": "10m",
         }
         body["dedupe_config"] = dedupe_config
-
-    if persona_shortname:
-        body["persona_name"] = f"{rw_workspace}--{persona_shortname}"
-    if notes:
-        body["notes"] = notes
-
-    if dry_run:
-        return body
 
     # ── 3. Auth headers ────────────────────────────────────────────────────
     sess = requests.Session()
@@ -361,7 +342,6 @@ def create_runsession_from_task_search(
             level="WARN",
         )
         return {}
-
 
 def get_persona_details(
     persona: str,
@@ -386,12 +366,13 @@ def get_persona_details(
     if user_token:
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {user_token}",
+            "Authorization": f"Bearer {user_token}"
         }
         session = requests.Session()
         session.headers.update(headers)
     else:
         session = platform.get_authenticated_session()
+
 
     try:
         response = session.get(url, timeout=10, verify=platform.REQUEST_VERIFY)
@@ -402,16 +383,15 @@ def get_persona_details(
         platform_logger.exception(e)
         return {}
 
-
 def add_tasks_to_runsession_from_search(
     search_response: dict,
-    runsession_id: str | None = None,
-    api_token: platform.Secret = None,
-    rw_api_url: str = "https://papi.beta.runwhen.com/api/v3",
-    rw_workspace: str = "my-workspace",
-    score_threshold: float = 0.7,
+    runsession_id: str | None = None,          
+    api_token: platform.Secret = None,           
+    rw_api_url: str         = "https://papi.beta.runwhen.com/api/v3",
+    rw_workspace: str       = "my-workspace",
+    score_threshold: float  = 0.7,
     source_query: str | None = None,
-    dry_run: bool = False,
+    dry_run: bool           = False,
 ):
     """
     Append tasks (score ≥ threshold) from *search_response* to an existing
@@ -457,11 +437,11 @@ def add_tasks_to_runsession_from_search(
             continue
 
         if new_struct:
-            ws = t["workspaceTask"]
-            slx = ws.get("slxShortName") or ws.get("slxName")
+            ws    = t["workspaceTask"]
+            slx   = ws.get("slxShortName") or ws.get("slxName")
             title = ws.get("unresolvedTitle") or ws.get("resolvedTitle")
         else:
-            slx = t.get("slxShortName") or t.get("slxName")
+            slx   = t.get("slxShortName") or t.get("slxName")
             title = t.get("taskName") or t.get("resolvedTaskName")
 
         if not slx or not title:
@@ -473,9 +453,7 @@ def add_tasks_to_runsession_from_search(
         task_pairs.append((slx, title))
 
     if not task_pairs:
-        BuiltIn().log(
-            "[patch_runsession] No tasks met the score threshold", level="INFO"
-        )
+        BuiltIn().log("[patch_runsession] No tasks met the score threshold", level="INFO")
         return {}
 
     # ── 2. Build merge-patch body ──────────────────────────────────────────
@@ -493,9 +471,9 @@ def add_tasks_to_runsession_from_search(
         return patch_body
 
     # ── 3. PATCH the RunSession ──────────────────────────────────────────────
-    base = rw_api_url.rstrip("/")  #  ➜ “…/api/v3”  or “…/api/v3/workspaces”
+    base = rw_api_url.rstrip("/")                #  ➜ “…/api/v3”  or “…/api/v3/workspaces”
     if not base.endswith("/workspaces"):
-        base += "/workspaces"
+        base += "/workspaces" 
     url = f"{base}/{rw_workspace}/runsessions/{runsession_id}"
 
     # ── 3a. Choose auth method ------------------------------------------------
@@ -508,17 +486,13 @@ def add_tasks_to_runsession_from_search(
     elif os.getenv("RW_USER_TOKEN"):
         # local dev or ad-hoc run
         session = requests.Session()
-        session.headers.update(
-            {"Authorization": f"Bearer {os.environ['RW_USER_TOKEN']}"}
-        )
+        session.headers.update({"Authorization": f"Bearer {os.environ['RW_USER_TOKEN']}"})
         BuiltIn().log("[patch_runsession] using RW_USER_TOKEN from env", level="INFO")
 
     else:
         # inside a runbook/runtime – session already carries auth headers
         session = platform.get_authenticated_session()
-        BuiltIn().log(
-            "[patch_runsession] using platform authenticated session", level="INFO"
-        )
+        BuiltIn().log("[patch_runsession] using platform authenticated session", level="INFO")
 
     headers = {"Content-Type": "application/json"}
 
