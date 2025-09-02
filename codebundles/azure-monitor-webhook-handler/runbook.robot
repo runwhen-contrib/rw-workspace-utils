@@ -165,6 +165,8 @@ Start RunSession From Azure Monitor Webhook Details
                     ...    runsession_prefix=Azure-Monitor-Alert-${alert_rule}
                     ...    notes=${CURRENT_SESSION_JSON["notes"]}
                     ...    source=${CURRENT_SESSION_JSON["source"]}
+                    ...    webhook_data=${WEBHOOK_JSON}
+                    ...    alert_source=Azure Monitor
                     IF    $runsession != {}
                         ${runsession_url}=     RW.RunSession.Get RunSession Url
                         ...    rw_runsession=${runsession["id"]}         
