@@ -2,21 +2,18 @@
     "name": "devtools",
     "shutdownAction": "none",
     "build": {
-        "dockerfile": "Dockerfile",
-        "args": {
-            "platform": "linux/amd64"
-        }
+        "dockerfile": "Dockerfile"
     },
     "updateRemoteUserUID": false,
     "overrideCommand": false,
     "runArgs": [
         "-p",
-        "4000:4000",
+        "3000:3000",
         "--name",
         "rw-workspace-utils"
     ],
     "forwardPorts": [
-        4000
+        3000
     ],
     "features": {
         "ghcr.io/devcontainers/features/docker-in-docker:2": {}

@@ -17,8 +17,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Tuple, Optional
 from robot.libraries.BuiltIn import BuiltIn
 
-from RW import platform
-from RW.Core import Core
+from RW import platform                      
+from RW.Core import Core                     
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging guarantees  – creates both Robot and Python loggers safely.
@@ -38,7 +38,6 @@ else:
 
 # Uniform WARNING helper
 
-
 def warning_log(msg: str, *details: Any) -> None:
     try:
         robot_logger.warn(msg)
@@ -46,12 +45,10 @@ def warning_log(msg: str, *details: Any) -> None:
         robot_logger.info(f"WARNING: {msg}")
 
     # stringify every detail first
-    text = " | ".join(
-        json.dumps(d) if isinstance(d, (dict, list)) else str(d) for d in details
-    )
+    text = " | ".join(json.dumps(d) if isinstance(d, (dict, list)) else str(d)
+                      for d in details)
 
     platform_logger.warning("%s – %s", msg, text)
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Module-level constants
@@ -66,7 +63,6 @@ SECRET_FILE_PREFIX: str = "secret_file__"
 # ===========================================================================
 # Internal paginator
 # ===========================================================================
-
 
 def _page_through_slxs(start_url: str, session: requests.Session) -> List[Dict]:
     """Internal: generic paginator compatible with both `next` and `page` meta."""
@@ -98,7 +94,6 @@ def _page_through_slxs(start_url: str, session: requests.Session) -> List[Dict]:
 # ===========================================================================
 # SLX-related helpers
 # ===========================================================================
-
 
 def get_slxs_with_tag(tag_list: List[Any]) -> List[Dict]:
     """
@@ -163,12 +158,10 @@ def get_slxs_with_entity_reference(entity_refs: List[str]) -> List[Dict]:
     token = os.getenv("RW_USER_TOKEN")
     if token:
         sess = requests.Session()
-        sess.headers.update(
-            {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            }
-        )
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
     else:
         sess = platform.get_authenticated_session()
 
@@ -224,7 +217,12 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
         warning_log("Runbook fetch failed", str(e))
         tasks = []
 
-    patch_body = {"runRequests": [{"slxName": f"{ws}--{slx}", "taskTitles": tasks}]}
+    patch_body = {
+        "runRequests": [{
+            "slxName": f"{ws}--{slx}",
+            "taskTitles": tasks
+        }]
+    }
     rs_url = f"{root}/{ws}/runsessions/{runsess}"
     try:
         rsp = sess.patch(rs_url, json=patch_body, timeout=10)
@@ -238,7 +236,6 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
 # ===========================================================================
 # Platform variable + import helpers
 # ===========================================================================
-
 
 def import_platform_variable(varname: str) -> str:
     """Return the value of a RunWhen platform-provided var or raise ImportError."""
@@ -260,9 +257,7 @@ def import_runsession_details(runsession_id: Optional[str] = None) -> Optional[s
         ws = import_platform_variable("RW_WORKSPACE")
         root = import_platform_variable("RW_WORKSPACE_API_URL")
     except ImportError:
-        BuiltIn().log(
-            "Missing required vars for import_runsession_details", level="WARN"
-        )
+        BuiltIn().log("Missing required vars for import_runsession_details", level="WARN")
         return None
 
     url = f"{root}/{ws}/runsessions/{runsession_id}"
@@ -392,7 +387,6 @@ def import_related_runsession_details(
 
         time.sleep(poll_interval)
 
-
 def get_workspace_config() -> list | dict:
     """
     Return workspace.yaml (already rendered to JSON by the Workspace-API).
@@ -407,15 +401,15 @@ def get_workspace_config() -> list | dict:
     """
     # ── 0. Resolve workspace + API root ─────────────────────────────────────
     try:
-        ws = import_platform_variable("RW_WORKSPACE")
+        ws   = import_platform_variable("RW_WORKSPACE")
         root = import_platform_variable("RW_WORKSPACE_API_URL")
     except ImportError:
-        return []  # running outside expected context
+        return []          # running outside expected context
 
     url = f"{root.rstrip('/')}/{ws}/branches/main/workspace.yaml?format=json"
 
     # ── 1. Build an authenticated session ──────────────────────────────────
-    sess = platform.get_authenticated_session()  # carries default auth
+    sess = platform.get_authenticated_session()      # carries default auth
 
     user_token = os.getenv("RW_USER_TOKEN")
     if user_token:
@@ -462,7 +456,6 @@ def get_nearby_slxs(workspace_config: dict, slx_name: str) -> list:
     # If we don't find the slx in any group, return an empty list.
     return []
 
-
 def get_workspace_slxs(
     rw_api_url: str,
     api_token: platform.Secret,
@@ -500,7 +493,6 @@ def get_workspace_slxs(
 # Task-search and report helpers
 # ===========================================================================
 
-
 def _post_json(session: requests.Session, url: str, payload: dict) -> dict:
     resp = session.post(url, json=payload, timeout=10, verify=platform.REQUEST_VERIFY)
 
@@ -521,7 +513,6 @@ def _post_json(session: requests.Session, url: str, payload: dict) -> dict:
 
     resp.raise_for_status()
     return resp.json()
-
 
 # ─────────────────────────────────────────────────────────────
 # Helper: build a cURL command from a requests session
@@ -544,7 +535,7 @@ def _as_curl(
     if timeout:
         parts.append(f"--max-time {timeout}")
     if not verify:
-        parts.append("-k")  # --insecure
+        parts.append("-k")          # --insecure
 
     # headers (session-level + requests default)
     hdrs = requests.utils.default_headers()
@@ -560,7 +551,6 @@ def _as_curl(
 
     parts.append(f"'{url}'")
     return " ".join(parts)
-
 
 def perform_task_search_with_persona(
     query: str,
@@ -584,12 +574,10 @@ def perform_task_search_with_persona(
     token = os.getenv("RW_USER_TOKEN")
     if token:
         sess = requests.Session()
-        sess.headers.update(
-            {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            }
-        )
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
     else:
         sess = platform.get_authenticated_session()
 
@@ -614,12 +602,10 @@ def perform_task_search(
     token = os.getenv("RW_USER_TOKEN")
     if token:
         sess = requests.Session()
-        sess.headers.update(
-            {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            }
-        )
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
     else:
         sess = platform.get_authenticated_session()
 
@@ -639,12 +625,11 @@ def build_task_report_md(
         (markdown_table: str, total_tasks: int)
     """
     tasks = [
-        t
-        for t in search_response.get("tasks", [])
+        t for t in search_response.get("tasks", [])
         if t.get("score", 0) >= score_threshold
     ]
     total_tasks = len(tasks)
-
+    
     # ── early-out when nothing passes the threshold ───────────────
     if not tasks:
         md = f"**No tasks found above confidence of {score_threshold}**"
