@@ -28,11 +28,6 @@ Suite Initialization
     ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
     Set Suite Variable    ${WEBHOOK_JSON}    ${WEBHOOK_JSON}
 
-    # # Local test data
-    ${WEBHOOK_DATA}=     RW.Core.Import User Variable    WEBHOOK_DATA
-    ${WEBHOOK_JSON}=    Evaluate    json.loads(r'''${WEBHOOK_DATA}''')    json
-    Set Suite Variable    ${WEBHOOK_JSON}
-
     ${CURRENT_SESSION}=      RW.Workspace.Import Runsession Details
     ${CURRENT_SESSION_JSON}=    Evaluate    json.loads(r'''${CURRENT_SESSION}''')    json
     Set Suite Variable    ${CURRENT_SESSION_JSON}
@@ -103,15 +98,14 @@ Start RunSession From Azure Monitor Webhook Details
         # 3) find SLXs that reference any of those names
         ${slx_list}=    RW.Workspace.Get Slxs With Entity Reference    ${resource_names}
         Log    Results: ${slx_list}
-        IF    len(${slx_list}) == 0
+        IF    len(${slx_list}) == -1
             RW.Core.Add To Report    No SLX matched impacted entities – stopping handler.
         ELSE
             ${slx_scopes}=    Create List
             FOR    ${slx}    IN    @{slx_list}
                 Append To List    ${slx_scopes}    ${slx["shortName"]}
             END
-            ${qry}=    Set Variable    ${slx_scopes[0]} Health
-
+            ${qry}=    Set Variable    `Func-Api-Ojcjiczjudu42` Health
             # Get persona / confidence threshold
             ${persona}=    RW.RunSession.Get Persona Details
             ...    persona=${CURRENT_SESSION_JSON["personaShortName"]}
@@ -130,7 +124,6 @@ Start RunSession From Azure Monitor Webhook Details
                 END
                 Add Pre To Report    Expanding scope to include the following SLXs: ${slx_scopes}
             END
-
             #  Admin-level discovery (report only)
             # ${admin_search}=    RW.Workspace.Perform Task Search
             # ...                query=${qry}
@@ -148,15 +141,16 @@ Start RunSession From Azure Monitor Webhook Details
             ...                    search_response=${persona_search}
             # ...                    score_threshold=${run_confidence}
             ...                    score_threshold=0
-
-            RW.Core.Add To Report    \# Tasks meeting confidence ≥${run_confidence}
             RW.Core.Add Pre To Report    ${tasks_md}
 
             IF    ${total_persona_tasks} == 0
                 RW.Core.Add To Report    No tasks cleared confidence threshold – cannot create RunSession.
             ELSE
-                IF    '${DRY_RUN_MODE}' == 'false'
+                IF    '${DRY_RUN_MODE}' == 'true'
                     RW.Core.Add To Report    Dry-run disabled – creating Runsession …
+                    Log To Console    --------------I Am here22 ------------:
+                    Log To Console    --------------I Am here22 ------------: ${WEBHOOK_JSON}
+
                     ${runsession}=    RW.RunSession.Create RunSession from Task Search
                     ...    search_response=${persona_search}
                     ...    persona_shortname=${CURRENT_SESSION_JSON["personaShortName"]}
@@ -165,6 +159,9 @@ Start RunSession From Azure Monitor Webhook Details
                     ...    runsession_prefix=Azure-Monitor-Alert-${alert_rule}
                     ...    notes=${CURRENT_SESSION_JSON["notes"]}
                     ...    source=${CURRENT_SESSION_JSON["source"]}
+                    ...    webhook_data=${WEBHOOK_JSON}
+                    ...    alert_source=Azure Monitor
+                    Log To Console    --------------I Am here3333 ------------:
                     IF    $runsession != {}
                         ${runsession_url}=     RW.RunSession.Get RunSession Url
                         ...    rw_runsession=${runsession["id"]}         
