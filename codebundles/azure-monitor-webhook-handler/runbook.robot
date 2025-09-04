@@ -41,7 +41,7 @@ Start RunSession From Azure Monitor Webhook Details
     [Documentation]    Parse the azure monitor webhook  and route and SLX where with matching SLX tags
     [Tags]    webhook    azuremonitor    alert    runwhen
 
-    RW.Core.Add Pre To Report    Full payload Abid222233:\n ${WEBHOOK_JSON["data"]}
+    RW.Core.Add Pre To Report    Full payload:\n ${WEBHOOK_JSON["data"]}
 
     ${essentials}=    Set Variable    ${WEBHOOK_JSON["data"]["essentials"]}
 
@@ -57,7 +57,7 @@ Start RunSession From Azure Monitor Webhook Details
     ${resource_group}=   Set Variable    ${parts[4]}
     ${resource_name}=    Set Variable    ${parts[-1]}
 
-    RW.Core.Add Pre To Report    SEVERITYABID: ${severity}
+    RW.Core.Add Pre To Report    SEVERITY: ${severity}
     RW.Core.Add Pre To Report    RULE: ${alert_rule}
     RW.Core.Add Pre To Report    DESC: ${description}
     RW.Core.Add Pre To Report    MONITOR CONDITION: ${monitor_condition}
