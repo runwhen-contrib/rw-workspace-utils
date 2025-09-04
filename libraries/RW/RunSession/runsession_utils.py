@@ -240,6 +240,8 @@ def create_runsession_from_task_search(
     rw_api_url: str | None = None,
     rw_workspace: str | None = None,
     dry_run: bool = False,
+    webhook_data: dict = {},
+    alert_source: str = "",
 ) -> dict | str:
     """Create a RunSession from a task-search response."""
 
@@ -315,6 +317,26 @@ def create_runsession_from_task_search(
 
     if dry_run:
         return body
+
+    if alert_source == "Azure Monitor" and webhook_data:
+        # Extract and structure external alert data
+        alert_data = webhook_data.get("data", {})
+        essentials = alert_data.get("essentials", {})
+        external_alert_data = {
+            "alert_id": essentials.get("alertId", ""),
+            "alert_type": essentials.get("signalType", ""),
+            "alert_source": alert_source,
+            "webhook_id": webhook_data.get("webhookId", ""),
+            "severity": essentials.get("severity", ""),
+            "received_time": essentials.get("firedDateTime", ""),
+            "body": webhook_data,
+        }
+        body["external_alert_data"] = external_alert_data
+
+        dedupe_config = {
+            "ttl": "10m",
+        }
+        body["dedupe_config"] = dedupe_config
 
     # ── 3. Auth headers ────────────────────────────────────────────────────
     if api_token:
