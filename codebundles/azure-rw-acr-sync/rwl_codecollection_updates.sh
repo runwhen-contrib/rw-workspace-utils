@@ -115,30 +115,69 @@ get_sorted_tags_by_date() {
         fi
 
         if [[ $repository_image == *.pkg.dev/* ]]; then
-            MANIFEST=$(curl -s "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/manifests/$TAG")
-            # Check if the manifest is multi-arch
-            media_type=$(echo "$MANIFEST" | jq -r '.mediaType')
-            if [ "$media_type" == "application/vnd.docker.distribution.manifest.list.v2+json" ]; then
-                # Multi-arch manifest
-                MANIFESTS=$(echo "$MANIFEST" | jq -c --arg arch "$desired_architecture" '.manifests[] | select(.platform.architecture == $arch)')
+            # Accept both Docker and OCI manifest(list) responses (ARCH FIX helper)
+            ACCEPT_HDR="-H Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
+            
+            MANIFEST=$(curl -sL $ACCEPT_HDR "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/manifests/$TAG")
+            media_type=$(echo "$MANIFEST" | jq -r '.mediaType // empty')
+            schema_version=$(echo "$MANIFEST" | jq -r '.schemaVersion // empty')
 
-                for MANIFEST_ITEM in $MANIFESTS; do
-                    ARCH_MANIFEST_DIGEST=$(echo "$MANIFEST_ITEM" | jq -r '.digest')
-                    ARCH_MANIFEST=$(curl -s "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/manifests/$ARCH_MANIFEST_DIGEST")
-                    CONFIG_DIGEST=$(echo "$ARCH_MANIFEST" | jq -r '.config.digest')
-                    CONFIG=$(curl -L -s "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/blobs/$CONFIG_DIGEST")
-                    CREATION_DATE=$(echo "$CONFIG" | jq -r '.created')
+            # Handle Docker v1 manifests (schemaVersion 1)
+            if [[ "$schema_version" == "1" ]]; then
+                # For v1 manifests, get creation date from history[0].v1Compatibility
+                V1_COMPAT=$(echo "$MANIFEST" | jq -r '.history[0].v1Compatibility // empty')
+                if [ -n "$V1_COMPAT" ]; then
+                    CREATION_DATE=$(echo "$V1_COMPAT" | jq -r '.created // empty')
+                    IMG_ARCH=$(echo "$V1_COMPAT" | jq -r '.architecture // empty')
+                    
+                    if [ "$IMG_ARCH" != "$desired_architecture" ]; then
+                        echo "Tag $TAG is single-arch $IMG_ARCH; wanted $desired_architecture — skipping." >&2
+                        continue
+                    fi
+                    
                     if [ -n "$CREATION_DATE" ]; then
                         tag_dates+=("$CREATION_DATE $TAG")
-                        break
                     fi
-                done
+                fi
+
+            # Treat manifest list / OCI index as multi-arch (ARCH FIX)
+            elif [[ "$media_type" == "application/vnd.docker.distribution.manifest.list.v2+json" || "$media_type" == "application/vnd.oci.image.index.v1+json" ]]; then
+                # Pick the child manifest matching desired architecture
+                MANIFEST_ITEM=$(echo "$MANIFEST" | jq -c --arg arch "$desired_architecture" '.manifests[] | select(.platform.architecture == $arch)' | head -n1)
+                if [ -z "$MANIFEST_ITEM" ]; then
+                    echo "No $desired_architecture variant for tag $TAG; skipping." >&2
+                    continue
+                fi
+
+                ARCH_MANIFEST_DIGEST=$(echo "$MANIFEST_ITEM" | jq -r '.digest')
+                ARCH_MANIFEST=$(curl -sL $ACCEPT_HDR "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/manifests/$ARCH_MANIFEST_DIGEST")
+                CONFIG_DIGEST=$(echo "$ARCH_MANIFEST" | jq -r '.config.digest // empty')
+                if [ -z "$CONFIG_DIGEST" ]; then
+                    echo "No config digest for $TAG ($ARCH_MANIFEST_DIGEST); skipping." >&2
+                    continue
+                fi
+                CONFIG=$(curl -sL "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/blobs/$CONFIG_DIGEST")
+                CREATION_DATE=$(echo "$CONFIG" | jq -r '.created // empty')
+
+                if [ -n "$CREATION_DATE" ]; then
+                    tag_dates+=("$CREATION_DATE $TAG")
+                fi
+
             else
-                # Single-arch manifest
-                CONFIG_DIGEST=$(echo "$MANIFEST" | jq -r '.config.digest')
-                CONFIG=$(curl -L -s "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/blobs/$CONFIG_DIGEST")
-                CREATION_DATE=$(echo "$CONFIG" | jq -r '.created')
-                
+                # Single-arch v2: verify architecture from config (ARCH FIX)
+                CONFIG_DIGEST=$(echo "$MANIFEST" | jq -r '.config.digest // empty')
+                if [ -z "$CONFIG_DIGEST" ]; then
+                    echo "No config digest found for $TAG; skipping." >&2
+                    continue
+                fi
+                CONFIG=$(curl -sL "https://us-west1-docker.pkg.dev/v2/${repository_image#*pkg.dev/}/blobs/$CONFIG_DIGEST")
+                IMG_ARCH=$(echo "$CONFIG" | jq -r '.architecture // empty')
+                CREATION_DATE=$(echo "$CONFIG" | jq -r '.created // empty')
+
+                if [ "$IMG_ARCH" != "$desired_architecture" ]; then
+                    echo "Tag $TAG is single-arch $IMG_ARCH; wanted $desired_architecture — skipping." >&2
+                    continue
+                fi
                 if [ -n "$CREATION_DATE" ]; then
                     tag_dates+=("$CREATION_DATE $TAG")
                 fi
@@ -274,6 +313,13 @@ main() {
                     echo "Skipping excluded tag: $tag"
                     continue
                 fi
+                
+                # Skip architecture-prefixed tags (arm64- and amd64-) as they are incorrect
+                if [[ "$tag" =~ ^(amd64|arm64)- ]]; then
+                    echo "Skipping architecture-prefixed tag: $tag"
+                    continue
+                fi
+                
                 selected_tag=$tag
                 break
             done
