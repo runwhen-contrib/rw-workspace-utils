@@ -249,16 +249,15 @@ Start RunSession From Azure Monitor Webhook Details
                     RW.Core.Add To Report    Dry-run disabled – creating Runsession …
                     # Add sourceRunSessionID to notes for traceability
                     ${source_session_id}=    Get From Dictionary    ${CURRENT_SESSION_JSON}    id    default=webhook-azure-monitor-trigger
-                    ${current_notes}=    Set Variable    ${CURRENT_SESSION_JSON["notes"]}
-                    ${enhanced_notes}=    Catenate    SEPARATOR=${\n}    ${current_notes}    sourceRunSessionID: ${source_session_id}
                     
                     ${runsession}=    RW.RunSession.Create RunSession from Task Search
                     ...    search_response=${persona_search}
                     ...    persona_shortname=${CURRENT_SESSION_JSON["personaShortName"]}
                     ...    score_threshold=${run_confidence}
                     ...    runsession_prefix=Azure-Monitor-Alert-${alert_rule}
-                    ...    notes=${enhanced_notes}
                     ...    source=${CURRENT_SESSION_JSON["source"]}
+                    ...    webhook_data=${WEBHOOK_JSON}
+                    ...    alert_source=Azure Monitor
                     IF    $runsession != {}
                         ${runsession_url}=     RW.RunSession.Get RunSession Url
                         ...    rw_runsession=${runsession["id"]}         
