@@ -301,9 +301,9 @@ main() {
         echo "  Current Tag: $current_tag"
         
         # Determine image category
-        local full_repo="$REGISTRY_REPOSITORY_PATH/$repo"
+        # Note: repo already contains the full path (e.g., "runwhen/runner")
         local category
-        category=$(get_image_category "$full_repo")
+        category=$(get_image_category "$repo")
         echo "  Category: $category"
         
         # Find appropriate tag based on category

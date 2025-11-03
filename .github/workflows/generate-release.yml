@@ -45,7 +45,7 @@ jobs:
 
           # Function to find the next release number for today
           get_next_release_number() {
-              local last_tag_number=$(git tag | grep "^$BASE_TAG" | awk -F '.' '{print $NF}' | sort -n | tail -1)
+              local last_tag_number=$(git tag | grep "^$BASE_TAG\.[0-9]*$" | awk -F '.' '{print $NF}' | sort -n | tail -1)
               if [ -z "$last_tag_number" ]; then
                   echo 1  # If no tags found for today, start with .1
               else
