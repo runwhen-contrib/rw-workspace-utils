@@ -26,6 +26,29 @@ Sync CodeCollection Images to ACR Registry `${REGISTRY_NAME}`
     ...    show_in_rwl_cheatsheet=false
 
     RW.Core.Add Pre To Report    CodeCollection Image Update Output:\n${codecollection_images.stdout}
+    
+    # Check for failures and create issue if needed
+    IF    ${codecollection_images.returncode} != 0
+        RW.Core.Add Issue
+        ...    title=CodeCollection Image Sync Failed to ACR Registry ${REGISTRY_NAME}
+        ...    severity=2
+        ...    next_steps=Check Azure credentials and subscription access.\nVerify AZURE_RESOURCE_SUBSCRIPTION_ID is correct.\nReview script output for specific errors.\nEnsure source registry connectivity (us-west1-docker.pkg.dev).
+        ...    expected=CodeCollection images should sync successfully to ACR registry.
+        ...    actual=CodeCollection image sync failed with return code ${codecollection_images.returncode}.
+        ...    reproduce_hint=${codecollection_images.cmd}
+        ...    details=Error Output:\n${codecollection_images.stderr}\n\nFull Output:\n${codecollection_images.stdout}
+    END
+    ${has_subscription_error}=    Evaluate    "Failed to set subscription" in """${codecollection_images.stdout}${codecollection_images.stderr}"""
+    IF    ${has_subscription_error}
+        RW.Core.Add Issue
+        ...    title=Azure Subscription Access Failed for ACR Registry ${REGISTRY_NAME}
+        ...    severity=2
+        ...    next_steps=Verify AZURE_RESOURCE_SUBSCRIPTION_ID is correct.\nCheck Azure credentials have access to the subscription.\nEnsure azure_credentials secret contains valid AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET.\nRun 'az account show' to verify current subscription.
+        ...    expected=Azure subscription should be accessible with provided credentials.
+        ...    actual=Failed to set or access Azure subscription.
+        ...    reproduce_hint=${codecollection_images.cmd}
+        ...    details=Script Output:\n${codecollection_images.stdout}\n\nError Output:\n${codecollection_images.stderr}
+    END
 
 Sync RunWhen Local Image Updates to ACR Registry`${REGISTRY_NAME}`
     [Documentation]    Sync RunWhen Local image upates that need to be synced internally to the private registry. 
@@ -41,6 +64,29 @@ Sync RunWhen Local Image Updates to ACR Registry`${REGISTRY_NAME}`
     ...    show_in_rwl_cheatsheet=false
 
     RW.Core.Add Pre To Report    RunWhen Local Image Update Output:\n${runwhen_local_images.stdout}
+    
+    # Check for failures and create issue if needed
+    IF    ${runwhen_local_images.returncode} != 0
+        RW.Core.Add Issue
+        ...    title=RunWhen Local Image Sync Failed to ACR Registry ${REGISTRY_NAME}
+        ...    severity=2
+        ...    next_steps=Check Azure credentials and subscription access.\nVerify Helm repository is accessible (${HELM_REPO_URL}).\nReview script output for specific errors.\nEnsure sufficient ACR storage quota.
+        ...    expected=RunWhen Local images should sync successfully to ACR registry.
+        ...    actual=RunWhen Local image sync failed with return code ${runwhen_local_images.returncode}.
+        ...    reproduce_hint=${runwhen_local_images.cmd}
+        ...    details=Error Output:\n${runwhen_local_images.stderr}\n\nFull Output:\n${runwhen_local_images.stdout}
+    END
+    ${has_subscription_error_rwl}=    Evaluate    "Failed to set subscription" in """${runwhen_local_images.stdout}${runwhen_local_images.stderr}"""
+    IF    ${has_subscription_error_rwl}
+        RW.Core.Add Issue
+        ...    title=Azure Subscription Access Failed for RunWhen Local Sync to ${REGISTRY_NAME}
+        ...    severity=2
+        ...    next_steps=Verify AZURE_RESOURCE_SUBSCRIPTION_ID is correct.\nCheck Azure credentials have access to the subscription.\nEnsure azure_credentials secret contains valid AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET.\nRun 'az account show' to verify current subscription.
+        ...    expected=Azure subscription should be accessible with provided credentials.
+        ...    actual=Failed to set or access Azure subscription.
+        ...    reproduce_hint=${runwhen_local_images.cmd}
+        ...    details=Script Output:\n${runwhen_local_images.stdout}\n\nError Output:\n${runwhen_local_images.stderr}
+    END
 
 
 *** Keywords ***
@@ -74,6 +120,12 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ${REF}=    RW.Core.Import User Variable    REF
+    ...    type=string
+    ...    description=The git reference (branch) for codecollection image tagging (e.g., main, dev)  
+    ...    pattern=\w*
+    ...    example=main
+    ...    default=main
 
     Set Suite Variable    ${DOCKER_USERNAME}    ""
     Set Suite Variable    ${DOCKER_TOKEN}    ""
@@ -95,9 +147,10 @@ Suite Initialization
     Set Suite Variable     ${REGISTRY_REPOSITORY_PATH}    ${REGISTRY_REPOSITORY_PATH}
     Set Suite Variable     ${REGISTRY_NAME}    ${REGISTRY_NAME}
     Set Suite Variable     ${USE_DATE_TAG}    ${USE_DATE_TAG}
+    Set Suite Variable     ${HELM_REPO_URL}    https://runwhen-contrib.github.io/helm-charts
     Set Suite Variable
     ...    ${env}
-    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"REGISTRY_NAME":"${REGISTRY_NAME}", "SYNC_IMAGES":"${SYNC_IMAGES}", "USE_DATE_TAG":"${USE_DATE_TAG}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "REF":"${REF}"}
 
 
 Import Docker Secrets

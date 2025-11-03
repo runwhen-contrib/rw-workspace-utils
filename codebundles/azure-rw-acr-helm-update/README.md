@@ -4,13 +4,36 @@ This is intended for use by customers running a private ACR registry which RunWh
 - azure-rw-acr-sync (Not this CodeBundle) - Synchronizes upstream RunWhen images into Azure Container Registry on a regular basis when updates are available. 
 - azure-rw-acr-helm-update (**This CodeBundle**) - Compares the running Helm release to the available images in ACR and applys a helm upgrade (cli based) if new images are available. 
 
-CodeBundle Configuraiton: 
-- REGISTRY_NAME - The ACR registry name
-- REGISTRY_REPOSITORY_PATH - The root path/directory in the ACR registry to search for images
-- HELM_APPLY_UPGRADE - Set to True to automatically apply the upgrade
-- NAMESPACE - The Kubernetes namespace
-- CONTEXT - The Kubernetes context
-- HELM_RELEASE - The name of the helm release to inspect and update
+## Image Tagging Strategy
+
+This codebundle handles two categories of images with different tagging strategies:
+
+### CodeCollection Images
+CodeCollection images use a REF-based tagging strategy with digest verification:
+- Tags follow the pattern: `${REF}-${HASH}` (e.g., `main-abc1234`)
+- The script looks for tags matching the current REF (default: `main`)
+- Compares image digests (SHA256) to ensure consistency
+- Excludes architecture-prefixed tags (e.g., `amd64-*`, `arm64-*`)
+- Falls back to `${REF}-latest` siblings with matching digests
+
+### RunWhen Local Images
+RunWhen Local images use simpler version-based tagging:
+- Uses standard semantic versioning
+- Selects the latest tag via version sort
+
+## CodeBundle Configuration
+
+Required Variables:
+- **REGISTRY_NAME** - The ACR registry name (e.g., `myacr.azurecr.io`)
+- **REGISTRY_REPOSITORY_PATH** - The root path/directory in the ACR registry to search for images (e.g., `runwhen`)
+- **NAMESPACE** - The Kubernetes namespace (e.g., `runwhen-local`)
+- **CONTEXT** - The Kubernetes context
+- **HELM_RELEASE** - The name of the helm release to inspect and update (e.g., `runwhen-local`)
+
+Optional Variables:
+- **HELM_APPLY_UPGRADE** - Set to `true` to automatically apply the upgrade (default: `false`)
+- **REF** - The git reference (branch) for codecollection image tagging (default: `main`)
+- **AZURE_RESOURCE_SUBSCRIPTION_ID** - The Azure Subscription ID (auto-detected if not set)
 
 This CodeBundle requires the following custom variables to be added to the workspaceInfo.yaml: 
 
