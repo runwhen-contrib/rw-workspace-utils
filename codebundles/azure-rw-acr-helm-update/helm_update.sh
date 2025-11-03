@@ -38,7 +38,10 @@ fi
 # Set the subscription to the determined ID
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
-az acr login -n "$REGISTRY_NAME"
+
+# Attempt ACR login (optional - not required since we use service principal auth)
+# Using || true to make it non-blocking if Docker is not available
+az acr login -n "$REGISTRY_NAME" 2>/dev/null || echo "Note: Direct ACR login not available (Docker not installed), using service principal authentication"
 
 # ===================================
 # Helper Functions
