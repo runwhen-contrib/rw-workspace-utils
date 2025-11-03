@@ -24,16 +24,54 @@ Apply Available RunWhen Helm Images in ACR Registry`${REGISTRY_NAME}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
     RW.Core.Add Pre To Report    ${rwl_image_updates.stdout}
+    
+    # Check for script failures
+    IF    ${rwl_image_updates.returncode} != 0
+        RW.Core.Add Issue
+        ...    title=Helm Image Update Check Failed for ${HELM_RELEASE} in ${NAMESPACE}
+        ...    severity=2
+        ...    next_steps=Check Azure subscription access and credentials.\nVerify kubeconfig has access to cluster ${CONTEXT}.\nEnsure Helm release ${HELM_RELEASE} exists in namespace ${NAMESPACE}.\nVerify ACR registry ${REGISTRY_NAME} is accessible.\nReview script output for specific errors.
+        ...    expected=Helm image update check should complete successfully.
+        ...    actual=Helm image update check failed with return code ${rwl_image_updates.returncode}.
+        ...    reproduce_hint=${rwl_image_updates.cmd}
+        ...    details=Error Output:\n${rwl_image_updates.stderr}\n\nFull Output:\n${rwl_image_updates.stdout}
+    END
+    
+    ${has_subscription_error}=    Evaluate    "Failed to set subscription" in """${rwl_image_updates.stdout}${rwl_image_updates.stderr}"""
+    IF    ${has_subscription_error}
+        RW.Core.Add Issue
+        ...    title=Azure Subscription Access Failed for Helm Update Check
+        ...    severity=2
+        ...    next_steps=Verify AZURE_RESOURCE_SUBSCRIPTION_ID is correct.\nCheck Azure credentials have access to the subscription.\nEnsure azure_credentials secret contains valid AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET.\nRun 'az account show' to verify current subscription.
+        ...    expected=Azure subscription should be accessible with provided credentials.
+        ...    actual=Failed to set or access Azure subscription.
+        ...    reproduce_hint=${rwl_image_updates.cmd}
+        ...    details=Script Output:\n${rwl_image_updates.stdout}\n\nError Output:\n${rwl_image_updates.stderr}
+    END
+    
+    ${has_helm_error}=    Evaluate    "No images found for Helm release" in """${rwl_image_updates.stdout}"""
+    IF    ${has_helm_error}
+        RW.Core.Add Issue
+        ...    title=Helm Release ${HELM_RELEASE} Not Found in Namespace ${NAMESPACE}
+        ...    severity=2
+        ...    next_steps=Verify Helm release name ${HELM_RELEASE} is correct.\nCheck namespace ${NAMESPACE} exists and contains the Helm release.\nVerify kubeconfig has proper permissions.\nRun 'helm list -n ${NAMESPACE} --kube-context ${CONTEXT}' to see available releases.
+        ...    expected=Helm release ${HELM_RELEASE} should exist in namespace ${NAMESPACE}.
+        ...    actual=No images found for Helm release ${HELM_RELEASE}.
+        ...    reproduce_hint=${rwl_image_updates.cmd}
+        ...    details=Script Output:\n${rwl_image_updates.stdout}
+    END
+    
+    # Check for available updates
     ${update_command}=    RW.CLI.Run Cli
     ...    cmd=[ -f "helm_update_required" ] && cat "helm_update_required" | grep true | awk -F ":" '{print $2}' | tr -d '\n'
     ...    env=${env}
     ...    include_in_history=false 
     IF    "${update_command.stdout}" != "" and "${HELM_APPLY_UPGRADE}" == "false"
-        RW.Core.Add Issue    title=OpenTelemetry Collector Has Error Logs
+        RW.Core.Add Issue
         ...    severity=3
-        ...    next_steps=Manually update RunWhen helm release with the following command. 
-        ...    actual=RunWhen Local helm release is not up to date. 
-        ...    expected=RunWhen Local helm releases should be up to date. 
+        ...    next_steps=Manually update RunWhen helm release with the following command, or set HELM_APPLY_UPGRADE=true to automatically apply updates.
+        ...    expected=RunWhen Local helm releases should be up to date.
+        ...    actual=RunWhen Local helm release is not up to date.
         ...    title=RunWhen Local image updates are available for namespace ${NAMESPACE} in cluster ${CONTEXT}
         ...    reproduce_hint=${rwl_image_updates.cmd}
         ...    details=Run the following command:\n ${update_command.stdout}
@@ -93,7 +131,13 @@ Suite Initialization
     ...    description=The Azure Subscription ID for the resource.  
     ...    pattern=\w*
     Set Suite Variable    ${AZURE_RESOURCE_SUBSCRIPTION_ID}    ${AZURE_RESOURCE_SUBSCRIPTION_ID}
+    ${REF}=    RW.Core.Import User Variable    REF
+    ...    type=string
+    ...    description=The git reference (branch) for codecollection image tagging (e.g., main, dev)  
+    ...    pattern=\w*
+    ...    example=main
+    ...    default=main
 
     Set Suite Variable
     ...    ${env}
-    ...    {"KUBECONFIG":"./${kubeconfig.key}", "HELM_RELEASE":"${HELM_RELEASE}","REGISTRY_NAME":"${REGISTRY_NAME}", "NAMESPACE":"${NAMESPACE}","CONTEXT":"${CONTEXT}", "HELM_APPLY_UPGRADE":"${HELM_APPLY_UPGRADE}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}"}
+    ...    {"KUBECONFIG":"./${kubeconfig.key}", "HELM_RELEASE":"${HELM_RELEASE}","REGISTRY_NAME":"${REGISTRY_NAME}", "NAMESPACE":"${NAMESPACE}","CONTEXT":"${CONTEXT}", "HELM_APPLY_UPGRADE":"${HELM_APPLY_UPGRADE}", "REGISTRY_REPOSITORY_PATH":"${REGISTRY_REPOSITORY_PATH}", "AZURE_RESOURCE_SUBSCRIPTION_ID":"${AZURE_RESOURCE_SUBSCRIPTION_ID}", "REF":"${REF}"}

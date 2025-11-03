@@ -6,7 +6,8 @@ on:
     branches:
       - main
     paths:
-      - VERSION
+      - 'libraries/**'
+      - '.github/workflows/pypi.yaml'
   workflow_dispatch:
 
 env:
@@ -18,26 +19,57 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
-      - name: Get version
+      - name: Fetch tags
+        run: git fetch --force --tags --prune
+
+      - name: Generate date-based version
         run: |-
-          if [[ -s VERSION ]]; then
-            VERSION=$(cat VERSION)
-            echo "VERSION=$VERSION" >> $GITHUB_ENV
-            echo "VERSION extracted: $VERSION"
-          else
-            echo "VERSION file is missing or empty" >&2
-            exit 1
-          fi
+          # Define the date format for the version: YYYY.MM.DD
+          DATE_FORMAT="+%Y.%m.%d"
+          
+          # Generate the base version based on the current date
+          BASE_VERSION=$(date "$DATE_FORMAT")
+          
+          # Function to find the next release number for today
+          get_next_release_number() {
+              local last_number=$(git tag | grep "^pypi-$BASE_VERSION\.[0-9]*$" | awk -F '.' '{print $NF}' | sort -n | tail -1)
+              if [ -z "$last_number" ]; then
+                  echo 1  # If no tags found for today, start with .1
+              else
+                  echo $((last_number + 1))  # Increment the last number by 1
+              fi
+          }
+          
+          NEXT_RELEASE_NUMBER=$(get_next_release_number)
+          VERSION="$BASE_VERSION.$NEXT_RELEASE_NUMBER"
+          
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Generated version: $VERSION"
+          
+          # Create a tag for tracking PyPI releases
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag "pypi-$VERSION"
+          git push origin "pypi-$VERSION" || echo "Tag already exists or push failed (non-fatal)"
 
       - name: Install dependencies
         run: |
           pip install --upgrade packaging setuptools wheel build twine
 
+      - name: Update version in pyproject.toml
+        run: |
+          echo "Setting version to ${VERSION} in pyproject.toml"
+          sed -i "s/^version = \"0.0.0\"/version = \"${VERSION}\"/" pyproject.toml
+          grep "^version = " pyproject.toml
+
       - name: Build Package (PEP 517)
         run: |
           # Clean old build artifacts first:
           rm -rf dist build *.egg-info
+          echo "Building package with version: ${VERSION}"
           # Use the modern build command:
           python -m build
 
