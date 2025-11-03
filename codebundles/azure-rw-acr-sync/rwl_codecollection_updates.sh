@@ -48,12 +48,14 @@ fi
 echo "Switching to subscription ID: $subscription"
 az account set --subscription "$subscription" || { echo "Failed to set subscription."; exit 1; }
 
-# Ensure Docker credentials are set to avoid throttling
+# Ensure Docker credentials are set to avoid throttling (for source registries like Docker Hub)
 if [[ -z "$docker_username" || -z "$docker_token" ]]; then
     echo "Warning: Docker credentials (DOCKER_USERNAME and DOCKER_TOKEN) should be set to avoid throttling."
 fi
 
-az acr login -n "$private_registry"
+# Attempt ACR login (optional - not required since we use service principal auth)
+# Using || true to make it non-blocking if Docker is not available
+az acr login -n "$private_registry" 2>/dev/null || echo "Note: Direct ACR login not available (Docker not installed), using service principal authentication"
 
 # ===================================
 # CodeCollection Image Definitions
