@@ -2,12 +2,7 @@ name: Release (Date-based)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'codebundles/**'
-      - 'libraries/**'
-      - '.github/workflows/generate-release.yml'
+
 
 permissions:
   contents: write
