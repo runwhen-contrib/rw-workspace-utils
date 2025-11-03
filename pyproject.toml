@@ -14,13 +14,13 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License"
 ]
-dynamic = ["version", "dependencies"]
+version = "0.0.0"  # Placeholder - actual version set at build time via SETUPTOOLS_SCM_PRETEND_VERSION
+dynamic = ["dependencies"]
 
 [tool.setuptools.packages.find]
 where = ["libraries"] 
 
 [tool.setuptools.dynamic]
-version = { file = "VERSION" }
 dependencies = { file = "requirements.txt" }
 
 [project.urls]
