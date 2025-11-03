@@ -24,7 +24,7 @@ Check for Available RunWhen Helm Images in ACR Registry`${REGISTRY_NAME}`
     ...    include_in_history=false
     ...    show_in_rwl_cheatsheet=false
     ${image_update_count}=    RW.CLI.Run Cli
-    ...    cmd=[ -f "update_images" ] && cat "update_images" | grep -v '^$' | wc -l
+    ...    cmd=[ -f "update_images" ] && cat "update_images" || echo 0
     ...    env=${env}
     ...    include_in_history=false 
 
