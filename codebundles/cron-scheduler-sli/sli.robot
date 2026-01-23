@@ -32,9 +32,11 @@ Suite Initialization
     ...    default=''
     
     # If TARGET_SLX is not provided, use the current SLX
-    IF    '${TARGET_SLX}' == '${EMPTY}' or '${TARGET_SLX}' == ''
+    ${target_slx_empty}=    Run Keyword And Return Status    Should Be Empty    ${TARGET_SLX}
+    IF    ${target_slx_empty}
         ${TARGET_SLX}=    RW.Workspace.Get Current SLX Short Name
-        IF    '${TARGET_SLX}' == 'None' or '${TARGET_SLX}' == ''
+        ${still_empty}=    Run Keyword And Return Status    Should Be Empty    ${TARGET_SLX}
+        IF    ${still_empty} or $TARGET_SLX == 'None'
             RW.Core.Add Issue
             ...    severity=2
             ...    expected=TARGET_SLX should be provided or SLI should be attached to an SLX
