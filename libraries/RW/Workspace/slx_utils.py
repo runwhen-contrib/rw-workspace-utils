@@ -83,7 +83,7 @@ def get_current_sli_interval_seconds(slx_short_name: Optional[str] = None) -> Op
     Get the intervalSeconds from the SLI's spec configuration.
     
     Args:
-        slx_short_name: Optional SLX short name. If not provided, attempts to auto-detect.
+        slx_short_name: Optional SLX short name. If not provided, attempts to auto-detect from RW_SLX.
     
     Returns the intervalSeconds value from the SLI spec, or None if it cannot be determined.
     Defaults to 60 seconds if not found.
@@ -96,18 +96,38 @@ def get_current_sli_interval_seconds(slx_short_name: Optional[str] = None) -> Op
         from RW.Workspace.workspace_utils import import_platform_variable
         from RW import platform
         
-        # Get workspace and API info
-        ws = import_platform_variable("RW_WORKSPACE")
-        root = import_platform_variable("RW_WORKSPACE_API_URL")
+        # Try to use RW_SLX_API_URL if it's available (already has full URL)
+        slx_api_url = os.getenv("RW_SLX_API_URL")
         
-        # Get SLX short name (use provided or try to auto-detect)
-        if not slx_short_name:
-            slx_short_name = get_current_slx_short_name()
-            if not slx_short_name:
-                BuiltIn().log("Could not determine SLX, defaulting to 60 seconds", level="WARN")
-                return 60
+        if slx_api_url:
+            # We have the full API URL already
+            slx_url = slx_api_url
+            BuiltIn().log(f"Using RW_SLX_API_URL: {slx_url}", level="INFO")
         else:
-            BuiltIn().log(f"Using provided SLX: {slx_short_name}", level="INFO")
+            # Construct URL from workspace and SLX name
+            ws = import_platform_variable("RW_WORKSPACE")
+            root = import_platform_variable("RW_WORKSPACE_API_URL")
+            
+            # Get SLX short name (use provided or try to auto-detect)
+            if not slx_short_name:
+                slx_short_name = get_current_slx_short_name()
+                if not slx_short_name:
+                    BuiltIn().log("Could not determine SLX, defaulting to 60 seconds", level="WARN")
+                    return 60
+            else:
+                BuiltIn().log(f"Using provided SLX: {slx_short_name}", level="INFO")
+            
+            # Handle workspace prefix
+            workspace_path = ws.lstrip('/')
+            if workspace_path.startswith('workspaces/'):
+                workspace_path = workspace_path[len('workspaces/'):]
+            
+            # Handle case where root might already include "/workspaces" suffix
+            base_url = root.rstrip('/')
+            if base_url.endswith('/workspaces'):
+                slx_url = f"{base_url}/{workspace_path}/slxs/{slx_short_name}"
+            else:
+                slx_url = f"{base_url}/workspaces/{workspace_path}/slxs/{slx_short_name}"
         
         # Build authenticated session
         token = os.getenv("RW_USER_TOKEN")
@@ -119,18 +139,6 @@ def get_current_sli_interval_seconds(slx_short_name: Optional[str] = None) -> Op
             })
         else:
             sess = platform.get_authenticated_session()
-        
-        # Handle workspace prefix
-        workspace_path = ws.lstrip('/')
-        if workspace_path.startswith('workspaces/'):
-            workspace_path = workspace_path[len('workspaces/'):]
-        
-        # Handle case where root might already include "/workspaces" suffix
-        base_url = root.rstrip('/')
-        if base_url.endswith('/workspaces'):
-            slx_url = f"{base_url}/{workspace_path}/slxs/{slx_short_name}"
-        else:
-            slx_url = f"{base_url}/workspaces/{workspace_path}/slxs/{slx_short_name}"
         
         try:
             response = sess.get(slx_url, timeout=120)

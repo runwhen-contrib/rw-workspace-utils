@@ -29,7 +29,7 @@ Suite Initialization
     ...    description=The short name of the target SLX whose runbook should be executed when the cron schedule matches. If empty, uses the current SLX (the SLX this SLI is attached to).
     ...    pattern=\w*
     ...    example=my-slx-shortname
-    ...    default=''
+    ...    default=${EMPTY}
     
     # If TARGET_SLX is not provided, use the current SLX
     ${target_slx_empty}=    Run Keyword And Return Status    Should Be Empty    ${TARGET_SLX}
