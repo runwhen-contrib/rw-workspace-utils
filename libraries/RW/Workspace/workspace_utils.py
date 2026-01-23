@@ -340,8 +340,13 @@ def get_slxs_with_targeted_entity_reference(entity_refs: List[str], tag_types: L
     return hits
 
 
+@keyword("Run Tasks For SLX")
 def run_tasks_for_slx(slx: str) -> Optional[Dict]:
-    """Create a runRequest containing all tasks in the SLX runbook."""
+    """
+    Create a runRequest containing all tasks in the SLX runbook.
+    DEPRECATED: Use Create RunSession For SLX instead for SLIs.
+    This function patches an existing runsession (requires RW_SESSION_ID).
+    """
     try:
         runsess = import_platform_variable("RW_SESSION_ID")
         ws = import_platform_variable("RW_WORKSPACE")
@@ -363,15 +368,27 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
     workspace_path = ws.lstrip('/')
     if workspace_path.startswith('workspaces/'):
         workspace_path = workspace_path[len('workspaces/'):]
+    
+    # Handle case where root might already include "/workspaces" suffix
+    base_url = root.rstrip('/')
+    if base_url.endswith('/workspaces'):
+        rb_url = f"{base_url}/{workspace_path}/slxs/{slx}/runbook"
+        rs_url = f"{base_url}/{workspace_path}/runsessions/{runsess}"
+    else:
+        rb_url = f"{base_url}/workspaces/{workspace_path}/slxs/{slx}/runbook"
+        rs_url = f"{base_url}/workspaces/{workspace_path}/runsessions/{runsess}"
         
-    rb_url = f"{root}/{workspace_path}/slxs/{slx}/runbook"
     try:
         rb = sess.get(rb_url, timeout=120)  # Increased timeout to 120 seconds
         rb.raise_for_status()
         tasks = rb.json().get("status", {}).get("codeBundle", {}).get("tasks", [])
     except (requests.RequestException, json.JSONDecodeError) as e:
         warning_log("Runbook fetch failed", str(e))
-        tasks = []
+        return None  # Return None instead of continuing with empty tasks
+    
+    if not tasks:
+        warning_log("No tasks found in runbook", slx)
+        return None
 
     patch_body = {
         "runRequests": [{
@@ -379,13 +396,89 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
             "taskTitles": tasks
         }]
     }
-    rs_url = f"{root}/{workspace_path}/runsessions/{runsess}"
     try:
         rsp = sess.patch(rs_url, json=patch_body, timeout=120)  # Increased timeout to 120 seconds
         rsp.raise_for_status()
         return rsp.json()
     except (requests.RequestException, json.JSONDecodeError) as e:
         warning_log("RunSession patch failed", str(e))
+        return None
+
+
+@keyword("Create RunSession For SLX")
+def create_runsession_for_slx(slx: str, source: str = "cronScheduler") -> Optional[Dict]:
+    """
+    Create a NEW runsession for the given SLX (runs all tasks from its runbook).
+    Does NOT require RW_SESSION_ID - suitable for SLIs that start new runsessions.
+    
+    Args:
+        slx: The SLX short name
+        source: Source identifier (default: "cronScheduler")
+    
+    Returns:
+        The created runsession JSON or None on failure
+    """
+    try:
+        ws = import_platform_variable("RW_WORKSPACE")
+        root = import_platform_variable("RW_WORKSPACE_API_URL")
+    except ImportError:
+        return None
+
+    token = os.getenv("RW_USER_TOKEN")
+    if token:
+        sess = requests.Session()
+        sess.headers.update({
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
+    else:
+        sess = platform.get_authenticated_session()
+
+    # Handle case where ws might already include "workspaces/" prefix
+    workspace_path = ws.lstrip('/')
+    if workspace_path.startswith('workspaces/'):
+        workspace_path = workspace_path[len('workspaces/'):]
+    
+    # Handle case where root might already include "/workspaces" suffix
+    base_url = root.rstrip('/')
+    if base_url.endswith('/workspaces'):
+        rb_url = f"{base_url}/{workspace_path}/slxs/{slx}/runbook"
+    else:
+        rb_url = f"{base_url}/workspaces/{workspace_path}/slxs/{slx}/runbook"
+    try:
+        rb = sess.get(rb_url, timeout=120)
+        rb.raise_for_status()
+        tasks = rb.json().get("status", {}).get("codeBundle", {}).get("tasks", [])
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        warning_log("Runbook fetch failed", str(e))
+        return None
+    
+    if not tasks:
+        warning_log("No tasks found in runbook", slx)
+        return None
+    
+    # Build the runsession creation payload
+    body = {
+        "generateName": "cron-scheduled",
+        "runRequests": [{
+            "slxName": f"{workspace_path}--{slx}",
+            "taskTitles": tasks,
+            "fromSearchQuery": source  # Use fromSearchQuery field (compatible with API)
+        }],
+        "active": True
+    }
+    
+    # Create new runsession
+    if base_url.endswith('/workspaces'):
+        rs_url = f"{base_url}/{workspace_path}/runsessions"
+    else:
+        rs_url = f"{base_url}/workspaces/{workspace_path}/runsessions"
+    try:
+        rsp = sess.post(rs_url, json=body, timeout=120)
+        rsp.raise_for_status()
+        return rsp.json()
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        warning_log("RunSession creation failed", str(e))
         return None
 
 
