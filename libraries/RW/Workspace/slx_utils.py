@@ -13,7 +13,7 @@ from robot.libraries.BuiltIn import BuiltIn
 @keyword("Get Current SLX Short Name")
 def get_current_slx_short_name() -> Optional[str]:
     """
-    Get the short name of the current SLX from the runsession details.
+    Get the short name of the current SLX from environment variables.
     
     Returns the short name of the SLX that this SLI/runbook is attached to,
     or None if it cannot be determined.
@@ -23,15 +23,24 @@ def get_current_slx_short_name() -> Optional[str]:
         Log    Running in SLX: ${current_slx}
     """
     try:
-        # Try to get from environment variable first (if it exists)
-        slx_name = os.getenv("RW_SLX_NAME")
+        # Try to get from RW_SLX environment variable (standard for SLI execution)
+        slx_name = os.getenv("RW_SLX")
         if slx_name:
             # Remove workspace prefix if present (workspace--slxname -> slxname)
+            if "--" in slx_name:
+                short_name = slx_name.split("--", 1)[1]
+                BuiltIn().log(f"Found SLX from RW_SLX env var: {short_name}", level="INFO")
+                return short_name
+            return slx_name
+        
+        # Fall back to RW_SLX_NAME (if it exists)
+        slx_name = os.getenv("RW_SLX_NAME")
+        if slx_name:
             if "--" in slx_name:
                 return slx_name.split("--", 1)[1]
             return slx_name
         
-        # Fall back to getting from runsession details
+        # Last resort: try getting from runsession details (requires RW_SESSION_ID)
         from RW.Workspace.workspace_utils import import_runsession_details
         
         runsession_json = import_runsession_details()
@@ -69,15 +78,18 @@ def get_current_slx_short_name() -> Optional[str]:
 
 
 @keyword("Get Current SLI Interval Seconds")
-def get_current_sli_interval_seconds() -> Optional[int]:
+def get_current_sli_interval_seconds(slx_short_name: Optional[str] = None) -> Optional[int]:
     """
-    Get the intervalSeconds from the current SLI's spec configuration.
+    Get the intervalSeconds from the SLI's spec configuration.
+    
+    Args:
+        slx_short_name: Optional SLX short name. If not provided, attempts to auto-detect.
     
     Returns the intervalSeconds value from the SLI spec, or None if it cannot be determined.
     Defaults to 60 seconds if not found.
     
     Example:
-        ${interval}=    Get Current SLI Interval Seconds
+        ${interval}=    Get Current SLI Interval Seconds    my-slx-name
         Log    SLI runs every ${interval} seconds
     """
     try:
@@ -88,11 +100,14 @@ def get_current_sli_interval_seconds() -> Optional[int]:
         ws = import_platform_variable("RW_WORKSPACE")
         root = import_platform_variable("RW_WORKSPACE_API_URL")
         
-        # Get current SLX short name
-        slx_short_name = get_current_slx_short_name()
+        # Get SLX short name (use provided or try to auto-detect)
         if not slx_short_name:
-            BuiltIn().log("Could not determine current SLX, defaulting to 60 seconds", level="WARN")
-            return 60
+            slx_short_name = get_current_slx_short_name()
+            if not slx_short_name:
+                BuiltIn().log("Could not determine SLX, defaulting to 60 seconds", level="WARN")
+                return 60
+        else:
+            BuiltIn().log(f"Using provided SLX: {slx_short_name}", level="INFO")
         
         # Build authenticated session
         token = os.getenv("RW_USER_TOKEN")

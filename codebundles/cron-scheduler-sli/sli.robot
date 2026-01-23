@@ -53,8 +53,8 @@ Suite Initialization
     
     Set Suite Variable    ${TARGET_SLX}    ${TARGET_SLX}
 
-    # Get the SLI interval from the SLX spec automatically
-    ${RUN_INTERVAL_SECONDS}=    RW.Workspace.Get Current SLI Interval Seconds
+    # Get the SLI interval from the SLX spec automatically (pass TARGET_SLX)
+    ${RUN_INTERVAL_SECONDS}=    RW.Workspace.Get Current SLI Interval Seconds    ${TARGET_SLX}
     RW.Core.Add To Report    Detected SLI interval: ${RUN_INTERVAL_SECONDS} seconds
     Set Suite Variable    ${RUN_INTERVAL_SECONDS}    ${RUN_INTERVAL_SECONDS}
 
