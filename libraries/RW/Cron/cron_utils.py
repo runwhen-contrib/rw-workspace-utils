@@ -72,14 +72,9 @@ def check_cron_schedule_match(
         # Calculate the difference in seconds
         time_diff = abs((base_time - prev_time).total_seconds())
         
-        # Also check the next scheduled time to handle edge cases where
-        # we're exactly at the scheduled time
-        cron_next = croniter(cron_schedule, base_time)
-        next_time = cron_next.get_next(datetime)
-        time_diff_next = abs((base_time - next_time).total_seconds())
-        
-        # Check if we're within the interval window of either prev or next
-        is_match = (time_diff <= interval_seconds) or (time_diff_next <= interval_seconds)
+        # Check if we're within the interval window AFTER the scheduled time
+        # This ensures we only trigger at or after the scheduled time, not before
+        is_match = time_diff <= interval_seconds
         
         if is_match:
             BuiltIn().log(

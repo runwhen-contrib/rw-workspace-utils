@@ -110,8 +110,12 @@ def get_current_sli_interval_seconds() -> Optional[int]:
         if workspace_path.startswith('workspaces/'):
             workspace_path = workspace_path[len('workspaces/'):]
         
-        # Fetch the SLX details
-        slx_url = f"{root}/{workspace_path}/slxs/{slx_short_name}"
+        # Handle case where root might already include "/workspaces" suffix
+        base_url = root.rstrip('/')
+        if base_url.endswith('/workspaces'):
+            slx_url = f"{base_url}/{workspace_path}/slxs/{slx_short_name}"
+        else:
+            slx_url = f"{base_url}/workspaces/{workspace_path}/slxs/{slx_short_name}"
         
         try:
             response = sess.get(slx_url, timeout=120)

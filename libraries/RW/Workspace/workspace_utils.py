@@ -384,7 +384,11 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
         tasks = rb.json().get("status", {}).get("codeBundle", {}).get("tasks", [])
     except (requests.RequestException, json.JSONDecodeError) as e:
         warning_log("Runbook fetch failed", str(e))
-        tasks = []
+        return None  # Return None instead of continuing with empty tasks
+    
+    if not tasks:
+        warning_log("No tasks found in runbook", slx)
+        return None
 
     patch_body = {
         "runRequests": [{
