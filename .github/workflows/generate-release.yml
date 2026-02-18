@@ -3,15 +3,12 @@ name: Release (Date-based)
 on:
   workflow_dispatch:
 
-
 permissions:
   contents: write
 
 jobs:
-  update-release-version:
+  release:
     runs-on: ubuntu-latest
-    outputs:
-      release_tag: ${{ steps.create_release.outputs.release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,49 +16,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Fetch tags
-        run: git fetch --force --tags --prune
-
-      - name: Create Date-based Tag and Release
+      - name: Create Release
         id: create_release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-
-          # Define the date format for the tag: YYYY-MM-DD
-          DATE_FORMAT="+%Y-%m-%d"
-          
-          # Generate the base tag name based on the current date
-          BASE_TAG=$(date "$DATE_FORMAT")
-
-          # Function to find the next release number for today
-          get_next_release_number() {
-              local last_tag_number=$(git tag | grep "^$BASE_TAG\.[0-9]*$" | awk -F '.' '{print $NF}' | sort -n | tail -1)
-              if [ -z "$last_tag_number" ]; then
-                  echo 1  # If no tags found for today, start with .1
-              else
-                  echo $((last_tag_number + 1))  # Increment the last number by 1
-              fi
-          }
-
-          # Generate the next release number
-          NEXT_RELEASE_NUMBER=$(get_next_release_number)
-          NEW_TAG="$BASE_TAG.$NEXT_RELEASE_NUMBER"
-
-          echo "Creating release tag: $NEW_TAG"
-
-          # Create the tag and push
-          git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
-          git push origin "$NEW_TAG"
-
-          echo "Created and pushed tag $NEW_TAG"
-
-          # Create a GitHub release with auto-generated notes
-          gh release create "$NEW_TAG" --generate-notes --latest
-
-          echo "Created GitHub release for $NEW_TAG"
-          echo "release_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+        uses: runwhen-contrib/github-actions/generate-release@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
