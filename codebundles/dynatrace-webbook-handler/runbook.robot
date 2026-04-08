@@ -63,7 +63,8 @@ Start RunSession From Dynatrace Webhook Details
         ELSE
             ${slx_scopes}=    Create List
             FOR    ${slx}    IN    @{slx_list}
-                Append To List    ${slx_scopes}    ${slx["shortName"]}
+                ${slx_name}=    Set Variable    ${slx.get("shortName", slx.get("short_name", ""))}
+                Append To List    ${slx_scopes}    ${slx_name}
             END
 
             # Get persona / confidence threshold

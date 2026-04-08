@@ -62,6 +62,20 @@ SECRET_FILE_PREFIX: str = "secret_file__"
 
 
 # ===========================================================================
+# v2 backward-compat helpers
+# ===========================================================================
+
+def _slx_short_name(slx: Dict) -> str:
+    """Extract short name from an SLX dict, handling both v2 (short_name) and legacy (shortName)."""
+    return slx.get("shortName") or slx.get("short_name", "")
+
+
+def _slx_alias(slx: Dict) -> str:
+    """Extract alias from an SLX dict, handling both v2 (top-level) and legacy (spec.alias)."""
+    return slx.get("spec", {}).get("alias") or slx.get("alias") or ""
+
+
+# ===========================================================================
 # Internal paginator
 # ===========================================================================
 
@@ -251,7 +265,7 @@ def get_slxs_with_entity_reference(entity_refs: List[str]) -> List[Dict]:
             break
             
         spec = slx.get("spec", {})
-        corpus = [spec.get("alias", "")]
+        corpus = [_slx_alias(slx)]
 
         # Only check tags, skip configProvided and additionalContext for broader search
         for t in spec.get("tags", []):
@@ -1034,7 +1048,7 @@ def perform_improved_task_search(
         resource_types = []
         for slx in slxs:
             # Collect aliases for fallback while we're processing SLXs
-            alias = slx.get("spec", {}).get("alias", "").strip()
+            alias = _slx_alias(slx).strip()
             if alias and alias not in collected_aliases:
                 collected_aliases.append(alias)
             
@@ -1145,7 +1159,7 @@ def perform_improved_task_search(
     slx_list = get_slxs_with_tag(resource_name_tags)
     
     if slx_list:
-        resource_slx_scopes = [slx["shortName"] for slx in slx_list]
+        resource_slx_scopes = [_slx_short_name(slx) for slx in slx_list]
         # Combine with existing scope if provided
         combined_scope = list(set((slx_scope or []) + resource_slx_scopes))
         
@@ -1180,7 +1194,7 @@ def perform_improved_task_search(
     slx_list = get_slxs_with_tag(child_resource_tags)
     
     if slx_list:
-        child_slx_scopes = [slx["shortName"] for slx in slx_list]
+        child_slx_scopes = [_slx_short_name(slx) for slx in slx_list]
         # Combine with existing scope if provided
         combined_scope = list(set((slx_scope or []) + child_slx_scopes))
         

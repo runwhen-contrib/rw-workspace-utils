@@ -38,9 +38,10 @@ Run SLX Tasks with matching PagerDuty Webhook Service ID
         ...    tag_list=[{"name": "pagerduty_service", "value": "${WEBHOOK_JSON["event"]["data"]["service"]["id"]}"}]
         Log    Results: ${slx_list}
         FOR    ${slx}    IN    @{slx_list} 
-            Log    ${slx["shortName"]} has matched
+            ${slx_name}=    Set Variable    ${slx.get("shortName", slx.get("short_name", ""))}
+            Log    ${slx_name} has matched
             ${runrequest}=    RW.Workspace.Run Tasks for SLX
-            ...    slx=${slx["shortName"]}
+            ...    slx=${slx_name}
         END
         Run Keyword If    '${PD_API_KEY}' != ''    Add RunSession Note To Incident
     END

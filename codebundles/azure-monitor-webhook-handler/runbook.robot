@@ -150,10 +150,11 @@ Start RunSession From Azure Monitor Webhook Details
             ${slx_aliases}=    Create List
             
             FOR    ${slx}    IN    @{slx_list}
-                Append To List    ${slx_scopes}    ${slx["shortName"]}
+                ${slx_name}=    Set Variable    ${slx.get("shortName", slx.get("short_name", ""))}
+                Append To List    ${slx_scopes}    ${slx_name}
                 
-                # Extract SLX alias
-                ${alias}=    Set Variable    ${slx["spec"]["alias"]}
+                # Extract SLX alias (v2 moves alias to top level; legacy has it in spec)
+                ${alias}=    Set Variable    ${slx.get("spec", {}).get("alias") or slx.get("alias", "")}
                 ${modified_alias}=    Set Variable    ${alias}
                 
                 # Find entities from this specific SLX's tags that appear in the alias

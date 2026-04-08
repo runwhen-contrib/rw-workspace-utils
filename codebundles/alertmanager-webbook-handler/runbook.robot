@@ -61,7 +61,8 @@ Add Tasks to RunSession from AlertManager Webhook Details
             RW.Core.Add To Report    Found SLX matches..continuing on with search. 
             ${slx_scopes}=    Create List
             FOR    ${slx}    IN    @{slx_list}
-                Append To List    ${slx_scopes}    ${slx["shortName"]}
+                ${slx_name}=    Set Variable    ${slx.get("shortName", slx.get("short_name", ""))}
+                Append To List    ${slx_scopes}    ${slx_name}
             END
 
             # Get persona / confidence threshold
