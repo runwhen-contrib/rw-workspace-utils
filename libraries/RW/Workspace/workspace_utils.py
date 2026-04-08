@@ -379,12 +379,15 @@ def run_tasks_for_slx(slx: str) -> Optional[Dict]:
         rs_url = f"{base_url}/workspaces/{workspace_path}/runsessions/{runsess}"
         
     try:
-        rb = sess.get(rb_url, timeout=120)  # Increased timeout to 120 seconds
+        rb = sess.get(rb_url, timeout=120)
         rb.raise_for_status()
-        tasks = rb.json().get("status", {}).get("codeBundle", {}).get("tasks", [])
+        rb_data = rb.json()
+        # backend-services-v2 returns resolved_tasks at top level;
+        # legacy backend-services nests them under status.codeBundle.tasks
+        tasks = rb_data.get("resolved_tasks") or rb_data.get("status", {}).get("codeBundle", {}).get("tasks", [])
     except (requests.RequestException, json.JSONDecodeError) as e:
         warning_log("Runbook fetch failed", str(e))
-        return None  # Return None instead of continuing with empty tasks
+        return None
     
     if not tasks:
         warning_log("No tasks found in runbook", slx)
@@ -448,7 +451,10 @@ def create_runsession_for_slx(slx: str, source: str = "cronScheduler") -> Option
     try:
         rb = sess.get(rb_url, timeout=120)
         rb.raise_for_status()
-        tasks = rb.json().get("status", {}).get("codeBundle", {}).get("tasks", [])
+        rb_data = rb.json()
+        # backend-services-v2 returns resolved_tasks at top level;
+        # legacy backend-services nests them under status.codeBundle.tasks
+        tasks = rb_data.get("resolved_tasks") or rb_data.get("status", {}).get("codeBundle", {}).get("tasks", [])
     except (requests.RequestException, json.JSONDecodeError) as e:
         warning_log("Runbook fetch failed", str(e))
         return None
