@@ -15,13 +15,10 @@ REGISTRY_REPOSITORY_PATH="${REGISTRY_REPOSITORY_PATH:-runwhen}"  # Default repos
 HELM_REPO_URL="${HELM_REPO_URL:-https://runwhen-contrib.github.io/helm-charts}"
 HELM_REPO_NAME="${HELM_REPO_NAME:-runwhen-contrib}"
 HELM_CHART_NAME="${HELM_CHART_NAME:-runwhen-local}"
+REGISTRY_CATALOG_URL="${REGISTRY_CATALOG_URL:-https://registry.runwhen.com}"
 
-# CodeCollection tagging configuration
+# CodeCollection version resolution via RunWhen Skills Registry catalog
 REF="${REF:-main}"
-LATEST_TAG="${REF}-latest"
-REF_HASH_REGEX="^${REF}-[0-9a-f]{7,}$"
-desired_architecture="amd64"
-declare -a tag_exclusion_list=("main-latest")
 
 # ===================================
 # Azure Setup
@@ -46,20 +43,6 @@ az acr login -n "$REGISTRY_NAME" 2>/dev/null || echo "Note: Direct ACR login not
 # ===================================
 # Helper Functions
 # ===================================
-
-# Check if tag is in exclusion list
-is_excluded_tag() {
-    local tag=$1
-    for excluded in "${tag_exclusion_list[@]}"; do
-        [[ "$tag" == "$excluded" ]] && return 0
-    done
-    return 1
-}
-
-# Check if tag has architecture prefix (amd64- or arm64-)
-is_arch_prefixed_tag() {
-    [[ "$1" =~ ^(amd64|arm64)- ]]
-}
 
 # Get image digest from ACR
 get_image_digest() {
@@ -99,112 +82,85 @@ resolve_REGISTRY_REPOSITORY_PATH() {
     echo "$input" | sed "s|\$REGISTRY_REPOSITORY_PATH|$REGISTRY_REPOSITORY_PATH|g" | xargs
 }
 
+resolve_mapping_field() {
+    local repo=$1
+    local field=$2
+    local resolved_mapping_file="resolved_mappings"
+
+    sed "s|\$REGISTRY_REPOSITORY_PATH|$REGISTRY_REPOSITORY_PATH|g" "$MAPPING_FILE" > "$resolved_mapping_file"
+
+    local value
+    value=$(yq eval ".images[] | select(.image == \"$repo\") | .${field}" "$resolved_mapping_file" 2>/dev/null | head -n1)
+
+    rm -f "$resolved_mapping_file"
+
+    if [[ -z "$value" || "$value" == "null" ]]; then
+        echo ""
+    else
+        echo "$value"
+    fi
+}
+
 # Get category for an image from mapping file
 get_image_category() {
     local repo=$1
-    local resolved_mapping_file="resolved_mappings"
-    
-    # Temporarily resolve placeholders
-    sed "s|\$REGISTRY_REPOSITORY_PATH|$REGISTRY_REPOSITORY_PATH|g" "$MAPPING_FILE" > "$resolved_mapping_file"
-    
     local category
-    category=$(yq eval ".images[] | select(.image == \"$repo\") | .category" "$resolved_mapping_file" 2>/dev/null | head -n1)
-    
-    rm -f "$resolved_mapping_file"
-    
-    if [[ -z "$category" || "$category" == "null" ]]; then
-        echo "runwhen_local"  # Default to simpler strategy
+    category=$(resolve_mapping_field "$repo" "category")
+
+    if [[ -z "$category" ]]; then
+        echo "runwhen_local"
     else
         echo "$category"
     fi
 }
 
-# Find best tag for codecollection images using REF-based strategy with digest matching
+# Get catalog slug for an image from mapping file
+get_image_slug() {
+    local repo=$1
+    resolve_mapping_field "$repo" "slug"
+}
+
+resolve_catalog_tag() {
+    local slug=$1
+    curl -sSf "${REGISTRY_CATALOG_URL}/api/v1/catalog/codecollections/${slug}/resolve?ref=${REF}" \
+        | jq -r '.image_tag // empty'
+}
+
+# Find tag for codecollection images using the RunWhen Skills Registry catalog
 find_codecollection_tag() {
     local registry_name=$1
     local repo=$2
     local current_tag=$3
-    
-    echo "🔍 Checking CodeCollection image with REF-based tagging strategy..." >&2
-    
-    # Fetch all tags
-    local tag_list
-    tag_list=$(az acr repository show-tags --name "${registry_name%%.*}" \
-        --repository "$repo" --orderby time_desc --query "[]" -o tsv 2>/dev/null)
-    
-    if [[ -z "$tag_list" ]]; then
-        echo "No tags found" >&2
-        echo ""
-        return 1
-    fi
-    
-    # Check if LATEST_TAG exists
-    if ! grep -qx "${LATEST_TAG}" <<<"$tag_list"; then
-        echo "⚠️  No ${LATEST_TAG} found, using current tag" >&2
+    local slug=$4
+
+    echo "🔍 Checking CodeCollection image via catalog (slug=${slug}, REF=${REF})..." >&2
+
+    if [[ -z "$slug" ]]; then
+        echo "⚠️  No catalog slug configured for ${repo}, using current tag" >&2
         echo "$current_tag"
         return 0
     fi
-    
-    # Get digest for LATEST_TAG
-    local latest_digest
-    latest_digest=$(get_image_digest "$registry_name" "$repo" "$LATEST_TAG")
-    
-    if [[ -z "$latest_digest" ]]; then
-        echo "⚠️  Unable to get digest for ${LATEST_TAG}, using current tag" >&2
+
+    local expected_tag
+    expected_tag=$(resolve_catalog_tag "$slug" 2>/dev/null || echo "")
+
+    if [[ -z "$expected_tag" ]]; then
+        echo "⚠️  Unable to resolve catalog tag for slug=${slug}, ref=${REF}" >&2
         echo "$current_tag"
         return 0
     fi
-    
-    echo "DEBUG: ${LATEST_TAG} digest = ${latest_digest}" >&2
-    
-    local selected_tag=""
-    
-    # Strategy 1: Prefer ref-hash sibling with same digest (exclude arch-prefixed tags)
-    while read -r t; do
-        [[ -z "$t" ]] && continue
-        [[ "$t" == "$LATEST_TAG" ]] && continue
-        is_excluded_tag "$t" && continue
-        is_arch_prefixed_tag "$t" && { echo "DEBUG: skip arch-prefixed $t" >&2; continue; }
-        [[ ! "$t" =~ $REF_HASH_REGEX ]] && continue
-        
-        local t_digest
-        t_digest=$(get_image_digest "$registry_name" "$repo" "$t")
-        [[ -z "$t_digest" ]] && continue
-        
-        echo "DEBUG: compare $t → $t_digest" >&2
-        if [[ "$t_digest" == "$latest_digest" ]]; then
-            selected_tag="$t"
-            break
-        fi
-    done <<<"$tag_list"
-    
-    # Strategy 2: Fallback to any non-arch, non-excluded sibling with same digest
-    if [[ -z "$selected_tag" ]]; then
-        while read -r t; do
-            [[ -z "$t" ]] && continue
-            [[ "$t" == "$LATEST_TAG" ]] && continue
-            is_excluded_tag "$t" && continue
-            is_arch_prefixed_tag "$t" && continue
-            
-            local t_digest
-            t_digest=$(get_image_digest "$registry_name" "$repo" "$t")
-            [[ -z "$t_digest" ]] && continue
-            
-            if [[ "$t_digest" == "$latest_digest" ]]; then
-                selected_tag="$t"
-                break
-            fi
-        done <<<"$tag_list"
-    fi
-    
-    if [[ -z "$selected_tag" ]]; then
-        echo "⚠️  ${LATEST_TAG} exists but no sibling with matching digest — using current tag" >&2
+
+    local expected_digest
+    expected_digest=$(get_image_digest "$registry_name" "$repo" "$expected_tag")
+
+    if [[ -z "$expected_digest" ]]; then
+        echo "ℹ️  Catalog tag ${expected_tag} is not present in ACR yet — run azure-rw-acr-sync first" >&2
         echo "$current_tag"
         return 0
     fi
-    
-    echo "✅ Found matching tag: ${selected_tag} (same digest as ${LATEST_TAG})" >&2
-    echo "$selected_tag"
+
+    echo "✅ Catalog tag for ${slug}: ${expected_tag}" >&2
+    echo "$expected_tag"
 }
 
 # Find best tag for runwhen_local images using simple version sorting
@@ -272,7 +228,8 @@ main() {
     echo "========================================"
     echo "RunWhen Local Helm Update Check"
     echo "========================================"
-    echo "REF=${REF} (using ${LATEST_TAG} for CodeCollection images)"
+    echo "Catalog: ${REGISTRY_CATALOG_URL}/api/v1/catalog/codecollections"
+    echo "REF=${REF} (CodeCollection tags resolved via catalog)"
     echo ""
     
     echo "Extracting images for Helm release '$HELM_RELEASE' in namespace '$NAMESPACE' on context '$CONTEXT'..."
@@ -312,7 +269,9 @@ main() {
         # Find appropriate tag based on category
         local new_tag=""
         if [[ "$category" == "codecollection" ]]; then
-            new_tag=$(find_codecollection_tag "$REGISTRY_NAME" "$repo" "$current_tag")
+            local slug
+            slug=$(get_image_slug "$repo")
+            new_tag=$(find_codecollection_tag "$REGISTRY_NAME" "$repo" "$current_tag" "$slug")
         else
             new_tag=$(find_runwhen_local_tag "$REGISTRY_NAME" "$repo" "$current_tag")
         fi

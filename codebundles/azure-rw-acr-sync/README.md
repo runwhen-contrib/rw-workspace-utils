@@ -12,27 +12,32 @@ This codebundle synchronizes upstream RunWhen images (CodeCollection and RunWhen
 This codebundle handles two categories of images with different tagging strategies:
 
 ### CodeCollection Images
-CodeCollection images use a REF-based tagging strategy with digest verification:
-- Source: `us-west1-docker.pkg.dev/runwhen-nonprod-beta/public-images/`
-- Tags follow pattern: `${REF}-${HASH}` (e.g., `main-abc1234`)
-- Uses digest (SHA256) comparison to find correct tags
-- Excludes architecture-prefixed tags (e.g., `amd64-*`, `arm64-*`)
-- Syncs stable commit-based tags instead of `-latest` tags
+CodeCollection images are resolved from the [RunWhen Skills Registry catalog](https://registry.runwhen.com/api/docs) (`GET /api/v1/catalog/codecollections`):
 
-**Images:**
-- `runwhen-contrib-rw-cli-codecollection`
-- `runwhen-contrib-rw-public-codecollection`
-- `runwhen-contrib-rw-generic-codecollection`
-- `runwhen-contrib-rw-workspace-utils`
-- `runwhen-contrib-azure-c7n-codecollection`
+- Source registries and tags come from the catalog (for example `ghcr.io/runwhen-contrib/rw-cli-codecollection`)
+- For each public catalog entry, the script calls `GET /api/v1/catalog/codecollections/{slug}/resolve?ref={REF}` to determine the image tag
+- Images are imported into ACR under `${REGISTRY_REPOSITORY_PATH}/{slug}` using the catalog tag (for example `main-b967857-6e4bc81`)
+
+**Public catalog collections include:**
+
+- `rw-cli-codecollection`
+- `rw-public-codecollection`
+- `rw-generic-codecollection`
+- `rw-workspace-utils`
+- `azure-c7n-codecollection`
+- `aws-c7n-codecollection`
+
+Catalog data is maintained in [codecollection-registry/cc-registry-v2](https://github.com/runwhen-contrib/codecollection-registry/tree/main/cc-registry-v2).
 
 ### RunWhen Local Images
 RunWhen Local images use simpler tagging:
+
 - Standard versioning or date-based tags
 - Latest tag selection via version sort
 - Supports optional date-based tagging with `USE_DATE_TAG=true`
 
 **Images:**
+
 - `runwhen-local`
 - `opentelemetry-collector`
 - `runner`
@@ -48,7 +53,8 @@ RunWhen Local images use simpler tagging:
 ### Optional Variables
 
 - **SYNC_IMAGES** - Set to `true` to sync images; `false` generates report only (default: `false` for SLI, `true` for Taskset)
-- **REF** - Git reference (branch) for codecollection image tagging (default: `main`)
+- **REF** - Git reference (branch) passed to the catalog resolve endpoint (default: `main`)
+- **REGISTRY_CATALOG_URL** - Base URL for the RunWhen Skills Registry API (default: `https://registry.runwhen.com`)
 - **USE_DATE_TAG** - Set to `true` to generate unique date-based tags for `latest` images (default: `false`)
 - **USE_DOCKER_AUTH** - Set to `true` to import Docker Hub credentials to bypass rate limits (default: `false`)
 
@@ -65,12 +71,10 @@ RunWhen Local images use simpler tagging:
 
 ### CodeCollection Sync Process
 
-1. Fetches all tags from source repository
-2. Looks for `${REF}-latest` tag (e.g., `main-latest`)
-3. Extracts the image digest (SHA256) for the specified architecture
-4. Finds sibling tags matching `${REF}-[0-9a-f]{7,}` with the same digest
-5. Syncs the stable hash-based tag to ACR (not the `-latest` tag)
-6. Verifies tag doesn't already exist before importing
+1. Lists public entries from `GET /api/v1/catalog/codecollections`
+2. Resolves each slug with `GET /api/v1/catalog/codecollections/{slug}/resolve?ref={REF}`
+3. Checks whether the resolved tag already exists in ACR at `${REGISTRY_REPOSITORY_PATH}/{slug}`
+4. Imports missing tags from the catalog `image_registry` into ACR
 
 ### RunWhen Local Sync Process
 
@@ -85,6 +89,7 @@ RunWhen Local images use simpler tagging:
 ### SLI (Service Level Indicator)
 
 The SLI checks for available updates and pushes a metric with the total count of images needing sync:
+
 - Runs on a schedule (e.g., every hour)
 - Reports number of outdated images
 - Does NOT sync by default (set `SYNC_IMAGES=true` to enable)
@@ -92,6 +97,7 @@ The SLI checks for available updates and pushes a metric with the total count of
 ### Taskset (On-Demand Sync)
 
 The Taskset performs the actual sync operation:
+
 - Runs on-demand or on schedule
 - Syncs images to ACR (default `SYNC_IMAGES=true`)
 - Adds detailed output to report
@@ -154,13 +160,13 @@ custom:
 
 ### Common Issues
 
-**"No ${REF}-latest found"**
-- Verify REF matches available branches in source registry
-- Check that source images exist
+**"Unable to resolve image for slug=..., ref=..."**
+- Verify REF matches a branch tracked in the catalog
+- Check catalog refs with `GET /api/v1/catalog/codecollections/{slug}/refs`
 
-**"Unable to resolve digest"**
-- Check network connectivity to source registry
-- Verify no firewall blocking Google Artifact Registry
+**"Failed to fetch catalog"**
+- Check network connectivity to `registry.runwhen.com`
+- Override `REGISTRY_CATALOG_URL` if using a private registry mirror
 
 **Rate limiting from Docker Hub**
 - Set `USE_DOCKER_AUTH=true`
@@ -175,12 +181,11 @@ custom:
 
 - Azure CLI (`az`) with ACR access
 - Network access to:
-  - `us-west1-docker.pkg.dev` (CodeCollection images)
-  - `ghcr.io` (RunWhen Local images)
-  - `docker.io` (Docker Hub images)
+  - `registry.runwhen.com` (catalog API)
+  - `ghcr.io` (CodeCollection images)
+  - `ghcr.io` / `docker.io` (RunWhen Local images)
 - Azure credentials with ACR import permissions
 
 ## Related CodeBundles
 
 - **azure-rw-acr-helm-update** - Detects and applies updates to RunWhen Local Helm releases using synced images
-

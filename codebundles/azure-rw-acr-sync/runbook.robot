@@ -32,7 +32,7 @@ Sync CodeCollection Images to ACR Registry `${REGISTRY_NAME}`
         RW.Core.Add Issue
         ...    title=CodeCollection Image Sync Failed to ACR Registry ${REGISTRY_NAME}
         ...    severity=2
-        ...    next_steps=Check Azure credentials and subscription access.\nVerify AZURE_RESOURCE_SUBSCRIPTION_ID is correct.\nReview script output for specific errors.\nEnsure source registry connectivity (us-west1-docker.pkg.dev).
+        ...    next_steps=Check Azure credentials and subscription access.\nVerify AZURE_RESOURCE_SUBSCRIPTION_ID is correct.\nReview script output for specific errors.\nEnsure catalog API connectivity (https://registry.runwhen.com).
         ...    expected=CodeCollection images should sync successfully to ACR registry.
         ...    actual=CodeCollection image sync failed with return code ${codecollection_images.returncode}.
         ...    reproduce_hint=${codecollection_images.cmd}

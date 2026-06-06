@@ -9,15 +9,16 @@ This is intended for use by customers running a private ACR registry which RunWh
 This codebundle handles two categories of images with different tagging strategies:
 
 ### CodeCollection Images
-CodeCollection images use a REF-based tagging strategy with digest verification:
-- Tags follow the pattern: `${REF}-${HASH}` (e.g., `main-abc1234`)
-- The script looks for tags matching the current REF (default: `main`)
-- Compares image digests (SHA256) to ensure consistency
-- Excludes architecture-prefixed tags (e.g., `amd64-*`, `arm64-*`)
-- Falls back to `${REF}-latest` siblings with matching digests
+CodeCollection images are resolved from the [RunWhen Skills Registry catalog](https://registry.runwhen.com/api/docs):
+
+- Each mapped image includes a catalog `slug` in `image_mappings.yaml`
+- The script calls `GET /api/v1/catalog/codecollections/{slug}/resolve?ref={REF}` to determine the expected tag
+- A Helm update is suggested when that catalog tag exists in ACR and differs from the running tag
+- If the catalog tag is not yet synced to ACR, run `azure-rw-acr-sync` first
 
 ### RunWhen Local Images
 RunWhen Local images use simpler version-based tagging:
+
 - Uses standard semantic versioning
 - Selects the latest tag via version sort
 
@@ -32,7 +33,8 @@ Required Variables:
 
 Optional Variables:
 - **HELM_APPLY_UPGRADE** - Set to `true` to automatically apply the upgrade (default: `false`)
-- **REF** - The git reference (branch) for codecollection image tagging (default: `main`)
+- **REF** - The git reference (branch) passed to the catalog resolve endpoint (default: `main`)
+- **REGISTRY_CATALOG_URL** - Base URL for the RunWhen Skills Registry API (default: `https://registry.runwhen.com`)
 - **AZURE_RESOURCE_SUBSCRIPTION_ID** - The Azure Subscription ID (auto-detected if not set)
 
 This CodeBundle requires the following custom variables to be added to the workspaceInfo.yaml: 
@@ -51,4 +53,4 @@ Pushes the metric of the total number of images that need to be updated.
 
 
 ## Taskset
-Performs the same function as the SLI, but adds the details to the report and can be run on demand. 
+Performs the same function as the SLI, but adds the details to the report and can be run on demand.
